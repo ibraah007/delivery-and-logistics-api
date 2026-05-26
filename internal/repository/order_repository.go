@@ -92,3 +92,26 @@ func GetPendingOrders() ([]models.Order, error) {
 
 	return orders, nil
 }
+// AssignDriver updates an order's status to 'in_transit' and sets the driver_id
+func AssignDriver(orderID uint, driverID uint) (bool, error) {
+	query := `
+		UPDATE orders
+		SET driver_id = $1, status = 'in_transit', updated_at = $2
+		WHERE id = $3 AND status = 'pending';
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := configs.DBInstance.ExecContext(ctx, query, driverID, time.Now(), orderID)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return rowsAffected > 0, nil
+}

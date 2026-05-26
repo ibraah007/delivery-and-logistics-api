@@ -73,3 +73,49 @@ func getPendingOrders(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(orders)
 }
+
+// AssignDriverHandler handles PUT requests to assign a driver to an order
+func AssignDriverHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var input struct {
+		OrderID  uint `json:"order_id"`
+		DriverID uint `json:"driver_id"`
+	}
+
+	// 1. Decode incoming assignment JSON
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Simple validation
+	if input.OrderID == 0 || input.DriverID == 0 {
+		http.Error(w, "Missing order_id or driver_id", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Update database state
+	updated, err := repository.AssignDriver(input.OrderID, input.DriverID)
+	if err != nil {
+		http.Error(w, "Database error during assignment: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !updated {
+		http.Error(w, "Assignment failed: Order not found or already assigned", http.StatusNotFound)
+		return
+	}
+
+	// 4. Return success status
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":  "Driver assigned successfully",
+		"order_id": input.OrderID,
+		"status":   "in_transit",
+	})
+}

@@ -20,18 +20,21 @@ func main() {
 
 	configs.ConnectDB()
 
-	// Health Check
+	// 1. Health Check
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status": "healthy", "service": "delivery-api"}`))
 	})
 
-	// User Routes
+	// 2. User Routes
 	http.HandleFunc("/register", handlers.RegisterUserHandler)
 
-	// Unified Order Routes (Handles both GET and POST)
+	// 3. Unified Order Routes (Handles both GET and POST)
 	http.HandleFunc("/orders", handlers.OrdersHandler)
+
+	// 4. Driver Assignment Route (Handles PUT)
+	http.HandleFunc("/orders/assign", handlers.AssignDriverHandler)
 
 	port := ":8080"
 	fmt.Printf("Backend API server listening on port %s 🚀\n", port)
