@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/ibrah/logistics-tracking-api/configs"
-	"github.com/ibrah/logistics-tracking-api/internal/handlers" // Imported handlers package
+	"github.com/ibrah/logistics-tracking-api/internal/handlers"
 	"github.com/joho/godotenv"
 )
 
@@ -32,7 +32,10 @@ func main() {
 	// 4. Register the user registration endpoint
 	http.HandleFunc("/register", handlers.RegisterUserHandler)
 
-	// 5. Start the server on port 8080
+	// 5. Register the order booking endpoint
+	http.HandleFunc("/orders", handlers.CreateOrderHandler)
+
+	// 6. Start the server on port 8080
 	port := ":8080"
 	fmt.Printf("Backend API server listening on port %s 🚀\n", port)
 	if err := http.ListenAndServe(port, nil); err != nil {
