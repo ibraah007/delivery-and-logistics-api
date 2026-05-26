@@ -115,3 +115,27 @@ func AssignDriver(orderID uint, driverID uint) (bool, error) {
 
 	return rowsAffected > 0, nil
 }
+
+// CompleteOrder marks an order as delivered and logs the final company expenses
+func CompleteOrder(orderID uint, expense float64) (bool, error) {
+	query := `
+		UPDATE orders
+		SET status = 'delivered', company_expense = $1, updated_at = $2
+		WHERE id = $3 AND status = 'in_transit';
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := configs.DBInstance.ExecContext(ctx, query, expense, time.Now(), orderID)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return rowsAffected > 0, nil
+}

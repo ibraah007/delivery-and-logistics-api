@@ -119,3 +119,50 @@ func AssignDriverHandler(w http.ResponseWriter, r *http.Request) {
 		"status":   "in_transit",
 	})
 }
+
+// CompleteOrderHandler handles PUT requests to mark an order as delivered
+func CompleteOrderHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var input struct {
+		OrderID        uint    `json:"order_id"`
+		CompanyExpense float64 `json:"company_expense"`
+	}
+
+	// 1. Decode the completion payload
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Validate input
+	if input.OrderID == 0 || input.CompanyExpense < 0 {
+		http.Error(w, "Missing order_id or invalid expense value", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Update state machine in PostgreSQL
+	completed, err := repository.CompleteOrder(input.OrderID, input.CompanyExpense)
+	if err != nil {
+		http.Error(w, "Database error during order completion: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !completed {
+		http.Error(w, "Completion failed: Order not found or not currently in_transit", http.StatusNotFound)
+		return
+	}
+
+	// 4. Send back structured success message
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":         "Order marked as delivered successfully",
+		"order_id":        input.OrderID,
+		"status":          "delivered",
+		"company_expense": input.CompanyExpense,
+	})
+}

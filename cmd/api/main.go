@@ -36,6 +36,9 @@ func main() {
 	// 4. Driver Assignment Route (Handles PUT)
 	http.HandleFunc("/orders/assign", handlers.AssignDriverHandler)
 
+	// 5. Order Completion Route (Handles PUT)
+	http.HandleFunc("/orders/complete", handlers.CompleteOrderHandler)
+
 	port := ":8080"
 	fmt.Printf("Backend API server listening on port %s 🚀\n", port)
 	if err := http.ListenAndServe(port, nil); err != nil {
