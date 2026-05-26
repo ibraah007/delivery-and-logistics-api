@@ -37,3 +37,58 @@ func InsertOrder(order models.Order) (uint, error) {
 
 	return lastInsertID, nil
 }
+
+// GetPendingOrders retrieves all orders from the database that are currently pending
+func GetPendingOrders() ([]models.Order, error) {
+	query := `
+		SELECT id, customer_id, driver_id, status, pickup_address, dropoff_address, customer_price, company_expense, created_at, updated_at
+		FROM orders
+		WHERE status = 'pending'
+		ORDER BY created_at DESC;
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := configs.DBInstance.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []models.Order
+
+	// Loop through rows returned by PostgreSQL
+	for rows.Next() {
+		var o models.Order
+		// Using pointers or checking for NULL values on nullable fields like driver_id
+		err := rows.Scan(
+			&o.ID,
+			&o.CustomerID,
+			&o.DriverID,
+			&o.Status,
+			&o.PickupAddress,
+			&o.DropoffAddress,
+			&o.CustomerPrice,
+			&o.CompanyExpense,
+			&o.CreatedAt,
+			&o.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, o)
+	}
+
+	// Check for errors encountered during iteration
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Return empty slice instead of null if no orders found
+	if orders == nil {
+		orders = []models.Order{}
+	}
+
+	return orders, nil
+}
