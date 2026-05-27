@@ -139,3 +139,44 @@ func CompleteOrder(orderID uint, expense float64) (bool, error) {
 
 	return rowsAffected > 0, nil
 }
+
+// ProfitMargins represents the financial health summary of the logistics engine
+type ProfitMargins struct {
+	TotalRevenue  float64 `json:"total_revenue"`
+	TotalExpenses float64 `json:"total_expenses"`
+	NetProfit     float64 `json:"net_profit"`
+	ProfitMargin  float64 `json:"profit_margin_percentage"`
+}
+
+// GetProfitMargins runs aggregation analytics across all orders
+func GetProfitMargins() (ProfitMargins, error) {
+	query := `
+		SELECT 
+			COALESCE(SUM(customer_price), 0.00) AS total_revenue,
+			COALESCE(SUM(company_expense), 0.00) AS total_expenses,
+			COALESCE(SUM(customer_price) - SUM(company_expense), 0.00) AS net_profit,
+			CASE 
+				WHEN SUM(customer_price) > 0 THEN 
+					ROUND(((SUM(customer_price) - SUM(company_expense)) / SUM(customer_price)) * 100, 2)
+				ELSE 0.00
+			END AS profit_margin_percentage
+		FROM orders;
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var margins ProfitMargins
+	err := configs.DBInstance.QueryRowContext(ctx, query).Scan(
+		&margins.TotalRevenue,
+		&margins.TotalExpenses,
+		&margins.NetProfit,
+		&margins.ProfitMargin,
+	)
+
+	if err != nil {
+		return margins, err
+	}
+
+	return margins, nil
+}

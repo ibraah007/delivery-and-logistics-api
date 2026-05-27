@@ -39,6 +39,9 @@ func main() {
 	// 5. Order Completion Route (Handles PUT)
 	http.HandleFunc("/orders/complete", handlers.CompleteOrderHandler)
 
+	// 6. Financial Analytics Route (Handles GET)
+	http.HandleFunc("/analytics/margins", handlers.GetAnalyticsMarginsHandler)
+
 	port := ":8080"
 	fmt.Printf("Backend API server listening on port %s 🚀\n", port)
 	if err := http.ListenAndServe(port, nil); err != nil {

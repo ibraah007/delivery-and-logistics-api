@@ -7,7 +7,7 @@ type User struct {
 	ID        uint      `json:"id"`
 	FullName  string    `json:"full_name"`
 	Email     string    `json:"email"`
-	Password  string    `json:"-"` // Never send passwords over the network
+	PasswordHash string `json:"-"` // Never send passwords over the network
 	Role      string    `json:"role"` // "admin", "driver", "customer"
 	CreatedAt time.Time `json:"created_at"`
 }
