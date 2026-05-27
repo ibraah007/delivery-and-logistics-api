@@ -34,6 +34,7 @@ func InsertUser(user models.User) (uint, error) {
 
 	return lastInsertID, nil
 }
+
 // GetUserByEmail finds a user record in the database using their unique email address
 func GetUserByEmail(email string) (models.User, error) {
 	query := `

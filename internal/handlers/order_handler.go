@@ -86,19 +86,16 @@ func AssignDriverHandler(w http.ResponseWriter, r *http.Request) {
 		DriverID uint `json:"driver_id"`
 	}
 
-	// 1. Decode incoming assignment JSON
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// 2. Simple validation
 	if input.OrderID == 0 || input.DriverID == 0 {
 		http.Error(w, "Missing order_id or driver_id", http.StatusBadRequest)
 		return
 	}
 
-	// 3. Update database state
 	updated, err := repository.AssignDriver(input.OrderID, input.DriverID)
 	if err != nil {
 		http.Error(w, "Database error during assignment: "+err.Error(), http.StatusInternalServerError)
@@ -110,7 +107,6 @@ func AssignDriverHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Return success status
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -120,10 +116,17 @@ func AssignDriverHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CompleteOrderHandler handles PUT requests to mark an order as delivered
+// CompleteOrderHandler handles PUT requests to mark an order as delivered securely
 func CompleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 1. Extract the user_id from the secure JWT context
+	userID, ok := r.Context().Value("user_id").(uint)
+	if !ok {
+		http.Error(w, "Unauthorized: Identity missing from session", http.StatusUnauthorized)
 		return
 	}
 
@@ -132,19 +135,30 @@ func CompleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 		CompanyExpense float64 `json:"company_expense"`
 	}
 
-	// 1. Decode the completion payload
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// 2. Validate input
 	if input.OrderID == 0 || input.CompanyExpense < 0 {
 		http.Error(w, "Missing order_id or invalid expense value", http.StatusBadRequest)
 		return
 	}
 
-	// 3. Update state machine in PostgreSQL
+	// 2. Real-App Security Validation: Check who this order belongs to
+	assignedDriverID, err := repository.GetOrderDriverID(input.OrderID)
+	if err != nil {
+		http.Error(w, "Order not found or database mismatch", http.StatusNotFound)
+		return
+	}
+
+	// 3. Enforce order ownership rules
+	if assignedDriverID != userID {
+		http.Error(w, "Forbidden: You cannot complete an order assigned to a different driver", http.StatusForbidden)
+		return
+	}
+
+	// 4. Update state machine in PostgreSQL if validation passes
 	completed, err := repository.CompleteOrder(input.OrderID, input.CompanyExpense)
 	if err != nil {
 		http.Error(w, "Database error during order completion: "+err.Error(), http.StatusInternalServerError)
@@ -152,11 +166,10 @@ func CompleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !completed {
-		http.Error(w, "Completion failed: Order not found or not currently in_transit", http.StatusNotFound)
+		http.Error(w, "Completion failed: Order is not currently marked as in_transit", http.StatusBadRequest)
 		return
 	}
 
-	// 4. Send back structured success message
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -174,14 +187,12 @@ func GetAnalyticsMarginsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Fetch data calculations from the repository
 	margins, err := repository.GetProfitMargins()
 	if err != nil {
 		http.Error(w, "Failed to calculate profit margins: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Return the analytics payload
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(margins)

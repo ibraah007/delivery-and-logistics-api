@@ -44,7 +44,7 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// 4. Attach user context information to the request so handlers can read it
 		ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
 		ctx = context.WithValue(ctx, "user_role", claims.Role)
-		
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }

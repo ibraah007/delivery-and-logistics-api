@@ -46,7 +46,7 @@ func TrackLocationHandler(w http.ResponseWriter, r *http.Request) {
 	// 4. Save the location ping to the PostgreSQL database using DBInstance
 	query := `INSERT INTO locations (driver_id, latitude, longitude, timestamp) 
 	          VALUES ($1, $2, $3, $4)`
-	
+
 	_, err = configs.DBInstance.Exec(query, location.DriverID, location.Latitude, location.Longitude, location.Timestamp)
 	if err != nil {
 		http.Error(w, "Failed to log location data: "+err.Error(), http.StatusInternalServerError)

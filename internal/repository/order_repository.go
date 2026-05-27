@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/ibrah/logistics-tracking-api/configs"
@@ -92,6 +93,7 @@ func GetPendingOrders() ([]models.Order, error) {
 
 	return orders, nil
 }
+
 // AssignDriver updates an order's status to 'in_transit' and sets the driver_id
 func AssignDriver(orderID uint, driverID uint) (bool, error) {
 	query := `
@@ -179,4 +181,18 @@ func GetProfitMargins() (ProfitMargins, error) {
 	}
 
 	return margins, nil
+}
+
+// GetOrderDriverID retrieves the assigned driver_id for a given order
+func GetOrderDriverID(orderID uint) (uint, error) {
+	var driverID sql.NullInt64
+	query := `SELECT driver_id FROM orders WHERE id = $1`
+	err := configs.DBInstance.QueryRow(query, orderID).Scan(&driverID)
+	if err != nil {
+		return 0, err
+	}
+	if !driverID.Valid {
+		return 0, nil // No driver assigned yet
+	}
+	return uint(driverID.Int64), nil
 }

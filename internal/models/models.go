@@ -4,18 +4,18 @@ import "time"
 
 // User represents anyone in the system (Admin, Driver, or Customer)
 type User struct {
-	ID        uint      `json:"id"`
-	FullName  string    `json:"full_name"`
-	Email     string    `json:"email"`
-	PasswordHash string `json:"-"` // Never send passwords over the network
-	Role      string    `json:"role"` // "admin", "driver", "customer"
-	CreatedAt time.Time `json:"created_at"`
+	ID           uint      `json:"id"`
+	FullName     string    `json:"full_name"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"`    // Never send passwords over the network
+	Role         string    `json:"role"` // "admin", "driver", "customer"
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // DriverProfile tracks availability and metrics for company expenses
 type DriverProfile struct {
 	UserID          uint    `json:"user_id"`
-	VehicleType     string  `json:"vehicle_type"`    // "bike", "car", "truck"
+	VehicleType     string  `json:"vehicle_type"` // "bike", "car", "truck"
 	IsAvailable     bool    `json:"is_available"`
 	CurrentVehicle  string  `json:"current_vehicle"` // License plate number
 	FuelExpenseRate float64 `json:"fuel_expense_rate"`
