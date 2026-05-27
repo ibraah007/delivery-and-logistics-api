@@ -32,16 +32,17 @@ func main() {
 	http.HandleFunc("/register", handlers.RegisterUserHandler)
 	http.HandleFunc("/login", handlers.LoginUserHandler)
 
-	// 3. Unified Order Routes (Public or validated inside handler)
+	// 3. Unified Order Routes
 	http.HandleFunc("/orders", handlers.OrdersHandler)
 
-	// 4. Driver Action Routes (Secured: Only Admins can assign drivers)
+	// 4. Driver Action Routes
 	http.HandleFunc("/orders/assign", middleware.AuthMiddleware(middleware.AdminOnly(handlers.AssignDriverHandler)))
-	
-	// 5. Order Completion Route (Secured: Must be logged in)
 	http.HandleFunc("/orders/complete", middleware.AuthMiddleware(handlers.CompleteOrderHandler))
 
-	// 6. Financial Analytics Route (Secured: Must be logged in AND an Admin)
+	// 5. Live Telemetry Route (Secured: Must be logged in as a driver)
+	http.HandleFunc("/driver/location", middleware.AuthMiddleware(handlers.TrackLocationHandler))
+
+	// 6. Financial Analytics Route
 	http.HandleFunc("/analytics/margins", middleware.AuthMiddleware(middleware.AdminOnly(handlers.GetAnalyticsMarginsHandler)))
 
 	port := ":8080"

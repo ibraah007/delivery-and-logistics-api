@@ -61,6 +61,14 @@ func MigrateDatabase() {
 		company_expense DECIMAL(10, 2) DEFAULT 0.00,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS locations (
+		id SERIAL PRIMARY KEY,
+		driver_id INT REFERENCES users(id) ON DELETE CASCADE,
+		latitude DOUBLE PRECISION NOT NULL,
+		longitude DOUBLE PRECISION NOT NULL,
+		timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);`
 
 	_, err := DBInstance.Exec(schema)
