@@ -166,3 +166,23 @@ func CompleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 		"company_expense": input.CompanyExpense,
 	})
 }
+
+// GetAnalyticsMarginsHandler handles GET requests for platform financial overview
+func GetAnalyticsMarginsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 1. Fetch data calculations from the repository
+	margins, err := repository.GetProfitMargins()
+	if err != nil {
+		http.Error(w, "Failed to calculate profit margins: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 2. Return the analytics payload
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(margins)
+}
