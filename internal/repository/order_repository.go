@@ -222,3 +222,33 @@ func GetDriverLocationHistory(driverID uint) ([]models.Location, error) {
 
 	return history, nil
 }
+
+// GetDriverLocationHistorySecured retrieves logged coordinates using a safe context timeout
+func GetDriverLocationHistorySecured(driverID uint) ([]models.Location, error) {
+	query := `SELECT driver_id, latitude, longitude, timestamp 
+	          FROM locations 
+	          WHERE driver_id = $1 
+	          ORDER BY timestamp DESC`
+
+	// Enforce a strict 3-second deadline for database response
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := configs.DBInstance.QueryContext(ctx, query, driverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []models.Location
+	for rows.Next() {
+		var loc models.Location
+		err := rows.Scan(&loc.DriverID, &loc.Latitude, &loc.Longitude, &loc.Timestamp)
+		if err != nil {
+			return nil, err
+		}
+		history = append(history, loc)
+	}
+
+	return history, nil
+}

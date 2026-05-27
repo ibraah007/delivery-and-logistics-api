@@ -11,33 +11,35 @@ import (
 	"github.com/ibrah/logistics-tracking-api/internal/repository"
 )
 
-// TrackLocationHandler handles live GPS pings from drivers
+// TrackLocationHandler handles live GPS pings from drivers with strict validation
 func TrackLocationHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 1. Extract the driver's user_id safely from the JWT context
 	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
 		http.Error(w, "Unauthorized: Identity missing", http.StatusUnauthorized)
 		return
 	}
 
-	// 2. Parse the latitude and longitude from the request body
 	var req struct {
 		Latitude  float64 `json:"latitude"`
 		Longitude float64 `json:"longitude"`
 	}
 
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil || req.Latitude == 0 || req.Longitude == 0 {
-		http.Error(w, "Invalid coordinates provided", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
 
-	// 3. Build our Location model
+	// Boundary Safeguard: Latitudes are [-90, 90], Longitudes are [-180, 180]
+	if req.Latitude < -90.0 || req.Latitude > 90.0 || req.Longitude < -180.0 || req.Longitude > 180.0 {
+		http.Error(w, "Bad Request: Coordinates out of realistic global boundaries", http.StatusBadRequest)
+		return
+	}
+
 	location := models.Location{
 		DriverID:  userID,
 		Latitude:  req.Latitude,
@@ -45,17 +47,15 @@ func TrackLocationHandler(w http.ResponseWriter, r *http.Request) {
 		Timestamp: time.Now(),
 	}
 
-	// 4. Save the location ping to the PostgreSQL database using DBInstance
 	query := `INSERT INTO locations (driver_id, latitude, longitude, timestamp) 
 	          VALUES ($1, $2, $3, $4)`
-	
-	_, err = configs.DBInstance.Exec(query, location.DriverID, location.Latitude, location.Longitude, location.Timestamp)
+
+	_, err := configs.DBInstance.Exec(query, location.DriverID, location.Latitude, location.Longitude, location.Timestamp)
 	if err != nil {
 		http.Error(w, "Failed to log location data: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 5. Send back a clean success response
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
@@ -64,14 +64,13 @@ func TrackLocationHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetTrackingHistoryHandler allows admins to review a driver's live route telemetry
+// GetTrackingHistoryHandler allows admins to review a driver's route telemetry safely
 func GetTrackingHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 1. Get the target driver_id from URL query string parameters (e.g., /admin/track?driver_id=3)
 	driverIDStr := r.URL.Query().Get("driver_id")
 	if driverIDStr == "" {
 		http.Error(w, "Missing required query parameter: driver_id", http.StatusBadRequest)
@@ -85,19 +84,17 @@ func GetTrackingHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Fetch tracking logs from repository
-	history, err := repository.GetDriverLocationHistory(driverID)
+	// Utilizing the updated timeout-secured repository function
+	history, err := repository.GetDriverLocationHistorySecured(driverID)
 	if err != nil {
 		http.Error(w, "Failed to retrieve tracking data: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 3. Return an empty array instead of null if no points logged yet
 	if history == nil {
 		history = []models.Location{}
 	}
 
-	// 4. Send back historical coordinates array
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(history)
