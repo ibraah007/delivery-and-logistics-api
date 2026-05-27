@@ -7,6 +7,7 @@ import (
 
 	"github.com/ibrah/logistics-tracking-api/configs"
 	"github.com/ibrah/logistics-tracking-api/internal/handlers"
+	"github.com/ibrah/logistics-tracking-api/internal/middleware"
 	"github.com/joho/godotenv"
 )
 
@@ -27,20 +28,19 @@ func main() {
 		w.Write([]byte(`{"status": "healthy", "service": "delivery-api"}`))
 	})
 
-	// 2. User Routes
+	// 2. User Authentication Routes
 	http.HandleFunc("/register", handlers.RegisterUserHandler)
+	http.HandleFunc("/login", handlers.LoginUserHandler)
 
-	// 3. Unified Order Routes (Handles both GET and POST)
+	// 3. Unified Order Routes (Public or validated inside handler)
 	http.HandleFunc("/orders", handlers.OrdersHandler)
 
-	// 4. Driver Assignment Route (Handles PUT)
+	// 4. Driver Action Routes
 	http.HandleFunc("/orders/assign", handlers.AssignDriverHandler)
-
-	// 5. Order Completion Route (Handles PUT)
 	http.HandleFunc("/orders/complete", handlers.CompleteOrderHandler)
 
-	// 6. Financial Analytics Route (Handles GET)
-	http.HandleFunc("/analytics/margins", handlers.GetAnalyticsMarginsHandler)
+	// 5. Financial Analytics Route (Secured: Must be logged in AND an Admin)
+	http.HandleFunc("/analytics/margins", middleware.AuthMiddleware(middleware.AdminOnly(handlers.GetAnalyticsMarginsHandler)))
 
 	port := ":8080"
 	fmt.Printf("Backend API server listening on port %s 🚀\n", port)
