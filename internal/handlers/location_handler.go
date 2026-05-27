@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/ibrah/logistics-tracking-api/configs"
 	"github.com/ibrah/logistics-tracking-api/internal/models"
+	"github.com/ibrah/logistics-tracking-api/internal/repository"
 )
 
 // TrackLocationHandler handles live GPS pings from drivers
@@ -46,7 +48,7 @@ func TrackLocationHandler(w http.ResponseWriter, r *http.Request) {
 	// 4. Save the location ping to the PostgreSQL database using DBInstance
 	query := `INSERT INTO locations (driver_id, latitude, longitude, timestamp) 
 	          VALUES ($1, $2, $3, $4)`
-
+	
 	_, err = configs.DBInstance.Exec(query, location.DriverID, location.Latitude, location.Longitude, location.Timestamp)
 	if err != nil {
 		http.Error(w, "Failed to log location data: "+err.Error(), http.StatusInternalServerError)
@@ -60,4 +62,43 @@ func TrackLocationHandler(w http.ResponseWriter, r *http.Request) {
 		"status":  "success",
 		"message": "Live location telemetry logged successfully",
 	})
+}
+
+// GetTrackingHistoryHandler allows admins to review a driver's live route telemetry
+func GetTrackingHistoryHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 1. Get the target driver_id from URL query string parameters (e.g., /admin/track?driver_id=3)
+	driverIDStr := r.URL.Query().Get("driver_id")
+	if driverIDStr == "" {
+		http.Error(w, "Missing required query parameter: driver_id", http.StatusBadRequest)
+		return
+	}
+
+	var driverID uint
+	_, err := fmt.Sscanf(driverIDStr, "%d", &driverID)
+	if err != nil || driverID == 0 {
+		http.Error(w, "Invalid driver_id format", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Fetch tracking logs from repository
+	history, err := repository.GetDriverLocationHistory(driverID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve tracking data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 3. Return an empty array instead of null if no points logged yet
+	if history == nil {
+		history = []models.Location{}
+	}
+
+	// 4. Send back historical coordinates array
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(history)
 }

@@ -196,3 +196,29 @@ func GetOrderDriverID(orderID uint) (uint, error) {
 	}
 	return uint(driverID.Int64), nil
 }
+
+// GetDriverLocationHistory retrieves all logged coordinates for a specific driver, newest first
+func GetDriverLocationHistory(driverID uint) ([]models.Location, error) {
+	query := `SELECT driver_id, latitude, longitude, timestamp 
+	          FROM locations 
+	          WHERE driver_id = $1 
+	          ORDER BY timestamp DESC`
+
+	rows, err := configs.DBInstance.Query(query, driverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []models.Location
+	for rows.Next() {
+		var loc models.Location
+		err := rows.Scan(&loc.DriverID, &loc.Latitude, &loc.Longitude, &loc.Timestamp)
+		if err != nil {
+			return nil, err
+		}
+		history = append(history, loc)
+	}
+
+	return history, nil
+}
