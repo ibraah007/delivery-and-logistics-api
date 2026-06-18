@@ -21,7 +21,7 @@
         header { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .grid { display: grid; grid-template-columns: 1fr 2.5fr; gap: 24px; }
         @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } }
-        .card { background: var(--bg-card); padding: 24px; border-radius: 12px; border: 1px solid var(--border); }
+        .card { background: var(--bg-card); padding: 24px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 24px; }
         h2 { margin-top: 0; font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 12px; color: var(--primary); }
         .form-group { margin-bottom: 14px; }
         label { display: block; margin-bottom: 6px; font-size: 13px; color: #94a3b8; }
@@ -40,6 +40,9 @@
         .btn-edit { background: var(--warning); color: black; }
         .btn-del { background: var(--danger); color: white; }
         .mode-toggle { background: #1e293b; border: 1px solid var(--border); color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; }
+        .history-feed { max-height: 200px; overflow-y: auto; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 13px; }
+        .history-item { padding: 6px 0; border-bottom: 1px solid #1e293b; color: #a7f3d0; }
+        .history-item span { color: #64748b; margin-right: 8px; }
     </style>
 </head>
 <body>
@@ -53,11 +56,10 @@
                 <button class="mode-toggle" id="connectionMode" onclick="toggleOfflineMode()">System Status: Live API Connected</button>
             </div>
         </header>
-
         <div class="grid">
             <div class="card">
                 <h2 id="formTitle">Register New Logistics Asset</h2>
-                <form id="driverForm">
+                <form id="driverForm" onsubmit="handleFormSubmit(event)">
                     <input type="hidden" id="driverId">
                     <div class="form-group">
                         <label>Personnel Full Name</label>
@@ -88,51 +90,67 @@
                     <button type="button" id="cancelBtn" style="background:#334155; color:white; margin-top:8px; display:none;" onclick="resetForm()">Cancel Update</button>
                 </form>
             </div>
-
-            <div class="card">
-                <h2>Active Operations Registry (Real-Time CRUD Tracking)</h2>
-                <div style="overflow-x: auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Driver Asset</th>
-                                <th>Operational Role</th>
-                                <th>Assigned Delivery Task</th>
-                                <th>Status</th>
-                                <th>Last GPS Location</th>
-                                <th>Management Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="fleetTableBody"></tbody>
-                    </table>
+            <div>
+                <div class="card">
+                    <h2>Active Operations Registry (Real-Time CRUD Tracking)</h2>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Driver Asset</th>
+                                    <th>Operational Role</th>
+                                    <th>Assigned Delivery Task</th>
+                                    <th>Status</th>
+                                    <th>Last GPS Location</th>
+                                    <th>Management Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fleetTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>Operations History & Audit Feed</h2>
+                    <div class="history-feed" id="historyLog">
+                        <div class="history-item"><span>[SYSTEM INITIALIZATION]</span> Connection established with tracking layer telemetry endpoints.</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
     <script>
-        const API_URL = 'http://127.0.0.1:8080/api/drivers'\;
+        const API_URL = 'http://127.0.0.1:8080/api/drivers';
         let isOfflineMode = false;
         let localOfflineDrivers = [
-            {id: 101, name: "Ibrah (Demo Mode)", role: "Fleet Supervisor", assigned_task: "Standalone Hub Routing", status: "Active", latitude: -0.0917, longitude: 34.7680}
+            {id: 1, name: "Ibrah Samwel", role: "Fleet Supervisor", assigned_task: "Overseeing Kisumu Hub Routes", status: "Active", latitude: -0.0917, longitude: 34.7680},
+            {id: 2, name: "Karis", role: "Long-Haul Trucker", assigned_task: "Transit: Nairobi to Malaba Border", status: "Active", latitude: -0.0932, longitude: 34.7695}
         ];
-
+        function logActivity(message) {
+            const container = document.getElementById('historyLog');
+            const time = new Date().toLocaleTimeString();
+            const logRow = document.createElement('div');
+            logRow.className = 'history-item';
+            logRow.innerHTML = `<span>[${time}]</span> ${message}`;
+            container.insertBefore(logRow, container.firstChild);
+        }
         function toggleOfflineMode() {
             isOfflineMode = !isOfflineMode;
             const btn = document.getElementById('connectionMode');
             btn.innerText = isOfflineMode ? "System Status: Local Client Demo (Offline Mode)" : "System Status: Live API Connected";
             btn.style.borderColor = isOfflineMode ? "var(--warning)" : "var(--border)";
+            logActivity(`Switched network state. Offline mode: ${isOfflineMode}`);
             loadDrivers();
         }
-
         function loadDrivers() {
             if (isOfflineMode) { renderTable(localOfflineDrivers); return; }
             fetch(API_URL)
                 .then(res => res.json())
                 .then(data => renderTable(data))
-                .catch(() => renderTable(localOfflineDrivers));
+                .catch(() => {
+                    if (!isOfflineMode) { isOfflineMode = true; document.getElementById('connectionMode').innerText = "System Status: Local Client Demo (Offline Mode)"; }
+                    renderTable(localOfflineDrivers);
+                });
         }
-
         function renderTable(data) {
             const tbody = document.getElementById('fleetTableBody');
             tbody.innerHTML = '';
@@ -147,49 +165,48 @@
                     <td style="font-family: monospace; font-size:12px;">${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)}</td>
                     <td>
                         <button class="action-btn btn-edit" onclick="editDriver(${d.id}, '${d.name}', '${d.role}', '${d.assigned_task}', '${d.status}')">Modify</button>
-                        <button class="action-btn btn-del" onclick="deleteDriver(${d.id})">Remove</button>
+                        <button class="action-btn btn-del" onclick="deleteDriver(${d.id}, '${d.name}')">Remove</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         }
-
-        document.getElementById('driverForm').addEventListener('submit', function(e) {
+        function handleFormSubmit(e) {
             e.preventDefault();
-            console.log("Form submission intercepted!");
             const id = document.getElementById('driverId').value;
             const name = document.getElementById('driverName').value;
             const role = document.getElementById('driverRole').value;
             const task = document.getElementById('driverTask').value;
             const status = document.getElementById('driverStatus').value;
             const payload = { name, role, assigned_task: task, status, latitude: -0.092, longitude: 34.76 };
-
             if (id) {
                 if (isOfflineMode) {
                     let idx = localOfflineDrivers.findIndex(x => x.id == id);
                     localOfflineDrivers[idx] = { ...localOfflineDrivers[idx], role, assigned_task: task, status };
+                    logActivity(`[OFFLINE] Profile modified for worker: ${localOfflineDrivers[idx].name}`);
                     resetForm(); loadDrivers();
                 } else {
                     fetch(`${API_URL}/action?id=${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
-                    }).then(() => { resetForm(); loadDrivers(); });
+                    }).then(() => { logActivity(`[API] Remote updates pushed successfully for worker profile.`); resetForm(); loadDrivers(); });
                 }
             } else {
                 if (isOfflineMode) {
-                    localOfflineDrivers.push({ id: Date.now(), name, role, assigned_task: task, status, latitude: -0.09, longitude: 34.7 });
+                    const newAsset = { id: Date.now(), name, role, assigned_task: task, status, latitude: -0.0917, longitude: 34.7680 };
+                    localOfflineDrivers.push(newAsset);
+                    logActivity(`[OFFLINE] Deployed brand new logistics asset: ${name} as ${role}`);
                     resetForm(); loadDrivers();
                 } else {
                     fetch(API_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
-                    }).then(() => { resetForm(); loadDrivers(); });
+                    }).then(() => { logActivity(`[API] Created and synchronized worker profile on server database: ${name}`); resetForm(); loadDrivers(); });
                 }
             }
-        });
-
+        }
         function editDriver(id, name, role, task, status) {
             document.getElementById('formTitle').innerText = "Modify Operational Profile";
             document.getElementById('driverId').value = id;
@@ -200,17 +217,17 @@
             document.getElementById('driverStatus').value = status;
             document.getElementById('submitBtn').innerText = "Commit Profile Updates";
             document.getElementById('cancelBtn').style.display = "block";
+            logActivity(`Loaded form edit buffers for asset: ${name}`);
         }
-
-        function deleteDriver(id) {
+        function deleteDriver(id, name) {
             if (isOfflineMode) {
                 localOfflineDrivers = localOfflineDrivers.filter(x => x.id != id);
+                logActivity(`[OFFLINE] Terminated assignment and deleted asset registry: ${name}`);
                 loadDrivers();
             } else {
-                fetch(`${API_URL}/action?id=${id}`, { method: 'DELETE' }).then(() => loadDrivers());
+                fetch(`${API_URL}/action?id=${id}`, { method: 'DELETE' }).then(() => { logActivity(`[API] Purged asset index ${id} permanently from backend router layer.`); loadDrivers(); });
             }
         }
-
         function resetForm() {
             document.getElementById('formTitle').innerText = "Register New Logistics Asset";
             document.getElementById('driverId').value = '';
@@ -220,7 +237,6 @@
             document.getElementById('submitBtn').innerText = "Deploy Logistics Asset";
             document.getElementById('cancelBtn').style.display = "none";
         }
-
         loadDrivers();
     </script>
 </body>
