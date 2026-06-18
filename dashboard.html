@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Transport Fleet Manager</title>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #151f32;
+            --primary: #38bdf8;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --border: #24334d;
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
+        }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-main); color: var(--text-main); margin: 0; padding: 24px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .grid { display: grid; grid-template-columns: 1fr 2.5fr; gap: 24px; }
+        @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } }
+        .card { background: var(--bg-card); padding: 24px; border-radius: 12px; border: 1px solid var(--border); }
+        h2 { margin-top: 0; font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 12px; color: var(--primary); }
+        .form-group { margin-bottom: 14px; }
+        label { display: block; margin-bottom: 6px; font-size: 13px; color: #94a3b8; }
+        input, select { width: 100%; padding: 10px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: white; box-sizing: border-box; }
+        button { background: var(--primary); color: #0b0f19; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
+        button:hover { opacity: 0.9; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+        th { background: #0f172a; color: #94a3b8; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .role-supervisor { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+        .role-longhaul { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+        .role-lastmile { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .role-loader { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+        .action-btn { padding: 6px 10px; border-radius: 4px; border: none; font-size: 12px; cursor: pointer; font-weight: bold; margin-right: 4px; }
+        .btn-edit { background: var(--warning); color: black; }
+        .btn-del { background: var(--danger); color: white; }
+        .mode-toggle { background: #1e293b; border: 1px solid var(--border); color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1 style="margin:0; font-size:22px;">Fleet Command Hub</h1>
+                <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted)">Live Logistics Infrastructure Overview</p>
+            </div>
+            <div>
+                <button class="mode-toggle" id="connectionMode" onclick="toggleOfflineMode()">System Status: Live API Connected</button>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <h2 id="formTitle">Register New Logistics Asset</h2>
+                <form id="driverForm">
+                    <input type="hidden" id="driverId">
+                    <div class="form-group">
+                        <label>Personnel Full Name</label>
+                        <input type="text" id="driverName" required placeholder="e.g. Ibrahim Samwel">
+                    </div>
+                    <div class="form-group">
+                        <label>Transport Domain Specialization</label>
+                        <select id="driverRole">
+                            <option value="Fleet Supervisor">Fleet Supervisor</option>
+                            <option value="Long-Haul Trucker">Long-Haul Trucker</option>
+                            <option value="Last-Mile Delivery">Last-Mile Delivery</option>
+                            <option value="Warehouse Loader">Warehouse Loader</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Active Route Task Assignment</label>
+                        <input type="text" id="driverTask" required placeholder="e.g. Loading at Warehouse A">
+                    </div>
+                    <div class="form-group">
+                        <label>Deployment Status</label>
+                        <select id="driverStatus">
+                            <option value="Active">Active</option>
+                            <option value="Idle">Idle</option>
+                            <option value="Off-Duty">Off-Duty</option>
+                        </select>
+                    </div>
+                    <button type="submit" id="submitBtn">Deploy Logistics Asset</button>
+                    <button type="button" id="cancelBtn" style="background:#334155; color:white; margin-top:8px; display:none;" onclick="resetForm()">Cancel Update</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>Active Operations Registry (Real-Time CRUD Tracking)</h2>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Driver Asset</th>
+                                <th>Operational Role</th>
+                                <th>Assigned Delivery Task</th>
+                                <th>Status</th>
+                                <th>Last GPS Location</th>
+                                <th>Management Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8080/api/drivers'\;
+        let isOfflineMode = false;
+        let localOfflineDrivers = [
+            {id: 101, name: "Ibrah (Demo Mode)", role: "Fleet Supervisor", assigned_task: "Standalone Hub Routing", status: "Active", latitude: -0.0917, longitude: 34.7680}
+        ];
+
+        function toggleOfflineMode() {
+            isOfflineMode = !isOfflineMode;
+            const btn = document.getElementById('connectionMode');
+            btn.innerText = isOfflineMode ? "System Status: Local Client Demo (Offline Mode)" : "System Status: Live API Connected";
+            btn.style.borderColor = isOfflineMode ? "var(--warning)" : "var(--border)";
+            loadDrivers();
+        }
+
+        function loadDrivers() {
+            if (isOfflineMode) { renderTable(localOfflineDrivers); return; }
+            fetch(API_URL)
+                .then(res => res.json())
+                .then(data => renderTable(data))
+                .catch(() => renderTable(localOfflineDrivers));
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('fleetTableBody');
+            tbody.innerHTML = '';
+            data.forEach(d => {
+                let roleClass = d.role.includes("Supervisor") ? 'role-supervisor' : d.role.includes("Long-Haul") ? 'role-longhaul' : d.role.includes("Loader") ? 'role-loader' : 'role-lastmile';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${d.name}</strong></td>
+                    <td><span class="badge ${roleClass}">${d.role}</span></td>
+                    <td>${d.assigned_task}</td>
+                    <td><span style="color: ${d.status === 'Active' ? '#10b981' : '#64748b'}">${d.status}</span></td>
+                    <td style="font-family: monospace; font-size:12px;">${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)}</td>
+                    <td>
+                        <button class="action-btn btn-edit" onclick="editDriver(${d.id}, '${d.name}', '${d.role}', '${d.assigned_task}', '${d.status}')">Modify</button>
+                        <button class="action-btn btn-del" onclick="deleteDriver(${d.id})">Remove</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('driverForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log("Form submission intercepted!");
+            const id = document.getElementById('driverId').value;
+            const name = document.getElementById('driverName').value;
+            const role = document.getElementById('driverRole').value;
+            const task = document.getElementById('driverTask').value;
+            const status = document.getElementById('driverStatus').value;
+            const payload = { name, role, assigned_task: task, status, latitude: -0.092, longitude: 34.76 };
+
+            if (id) {
+                if (isOfflineMode) {
+                    let idx = localOfflineDrivers.findIndex(x => x.id == id);
+                    localOfflineDrivers[idx] = { ...localOfflineDrivers[idx], role, assigned_task: task, status };
+                    resetForm(); loadDrivers();
+                } else {
+                    fetch(`${API_URL}/action?id=${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }).then(() => { resetForm(); loadDrivers(); });
+                }
+            } else {
+                if (isOfflineMode) {
+                    localOfflineDrivers.push({ id: Date.now(), name, role, assigned_task: task, status, latitude: -0.09, longitude: 34.7 });
+                    resetForm(); loadDrivers();
+                } else {
+                    fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }).then(() => { resetForm(); loadDrivers(); });
+                }
+            }
+        });
+
+        function editDriver(id, name, role, task, status) {
+            document.getElementById('formTitle').innerText = "Modify Operational Profile";
+            document.getElementById('driverId').value = id;
+            document.getElementById('driverName').value = name;
+            document.getElementById('driverName').disabled = true;
+            document.getElementById('driverRole').value = role;
+            document.getElementById('driverTask').value = task;
+            document.getElementById('driverStatus').value = status;
+            document.getElementById('submitBtn').innerText = "Commit Profile Updates";
+            document.getElementById('cancelBtn').style.display = "block";
+        }
+
+        function deleteDriver(id) {
+            if (isOfflineMode) {
+                localOfflineDrivers = localOfflineDrivers.filter(x => x.id != id);
+                loadDrivers();
+            } else {
+                fetch(`${API_URL}/action?id=${id}`, { method: 'DELETE' }).then(() => loadDrivers());
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('formTitle').innerText = "Register New Logistics Asset";
+            document.getElementById('driverId').value = '';
+            document.getElementById('driverName').value = '';
+            document.getElementById('driverName').disabled = false;
+            document.getElementById('driverTask').value = '';
+            document.getElementById('submitBtn').innerText = "Deploy Logistics Asset";
+            document.getElementById('cancelBtn').style.display = "none";
+        }
+
+        loadDrivers();
+    </script>
+</body>
+</html>
