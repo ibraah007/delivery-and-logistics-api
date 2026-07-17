@@ -6,9 +6,10 @@ import (
 	"log"
 	"net/http"
 	"net/smtp"
+	"net/url"
+	"strings"
 )
 
-// Driver represents our worker asset
 type Driver struct {
 	ID           int     `json:"id"`
 	Name         string  `json:"name"`
@@ -19,23 +20,28 @@ type Driver struct {
 	Longitude    float64 `json:"longitude"`
 }
 
-// DispatchPayload captures the frontend messaging form
 type DispatchPayload struct {
 	Recipient string `json:"recipient"`
 	Channel   string `json:"channel"`
+	Contact   string `json:"contact"` 
 	Customer  string `json:"customer"`
 	Body      string `json:"body"`
 }
 
 var drivers = []Driver{
 	{ID: 1, Name: "Ibrah Samwel", Role: "Fleet Supervisor", AssignedTask: "Overseeing Kisumu Hub Routes", Status: "Active", Latitude: -0.0917, Longitude: 34.7680},
+	{ID: 2, Name: "Karis", Role: "Long-Haul Trucker", AssignedTask: "Transit: Nairobi to Malaba Border", Status: "Active", Latitude: -0.0932, Longitude: 34.7695},
 }
 
 func main() {
 	http.HandleFunc("/api/drivers", driversHandler)
-	http.HandleFunc("/api/dispatch", dispatchHandler) // New Route for actual alerts
+	http.HandleFunc("/api/dispatch", dispatchHandler)
 
-	fmt.Println("Backend system online running on http://127.0.0.1:8080")
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./dashboard.html")
+	})
+
+	fmt.Println("Backend & UI System online running on http://127.0.0.1:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -47,7 +53,6 @@ func driversHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func dispatchHandler(w http.ResponseWriter, r *http.Request) {
-	// Setup CORS headers so your frontend dashboard can talk to it cleanly
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -69,52 +74,81 @@ func dispatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ----------------------------------------------------------------
-	// REAL EMAIL SMTP SETUP
-	// ----------------------------------------------------------------
-	fromEmail := "your-email@gmail.com" // Change to your Gmail address
-	password := "your-app-password"     // Change to your 16-character Google App Password
+	fmt.Printf("[DISPATCH EVENT] Channel: %s | Target: %s (%s) | Job/Customer: %s\n", 
+		payload.Channel, payload.Recipient, payload.Contact, payload.Customer)
+
+	fromEmail := "your-email@gmail.com"       
+	password := "your-app-password"           
 	smtpHost := "smtp.gmail.com"
 	smtpPort := "587"
 
-	// Hardcoded destination mail targets for your test
-	driverEmail := "your-driver-email@example.com"   // Put your actual email address here
-	customerEmail := "your-friend-email@example.com" // Put your friend's email address here
+	atUsername := "sandbox"                  
+	atAPIKey := "YOUR_AFRICAS_TALKING_KEY"    
+	isSandbox := true                         
 
-	auth := smtp.PlainAuth("", fromEmail, password, smtpHost)
+	if payload.Channel == "Email" {
+		auth := smtp.PlainAuth("", fromEmail, password, smtpHost)
+		messageContent := []byte(fmt.Sprintf("To: %s\r\n"+
+			"Subject: Fleet Command Hub - Operational Dispatch Notification\r\n\r\n"+
+			"Attention %s,\n\n"+
+			"You have a new logistics task alert assigned.\n\n"+
+			"Details:\n"+
+			"- Associated Context: %s\n"+
+			"- Task Manifest: %s\n", 
+			payload.Contact, payload.Recipient, payload.Customer, payload.Body))
 
-	// Formulating clear, clean body configurations for both target users
-	driverMessage := []byte(fmt.Sprintf("To: %s\r\n"+
-		"Subject: Fleet Matrix System - New Job Dispatch Alert\r\n\r\n"+
-		"Hello %s,\n\nYou have been assigned a new logistics movement task.\n"+
-		"Job Context / Customer Reference: %s\n\n"+
-		"Operational Instructions:\n%s\n\n"+
-		"Please check your active fleet console map immediately to begin route logging.\n",
-		driverEmail, payload.Recipient, payload.Customer, payload.Body))
+		err = smtp.SendMail(smtpHost+":"+smtpPort, auth, fromEmail, []string{payload.Contact}, messageContent)
+		if err != nil {
+			log.Println("SMTP Error:", err)
+			http.Error(w, "Failed to connect and deliver message via mail server.", http.StatusInternalServerError)
+			return
+		}
+	} else if payload.Channel == "SMS" {
+		toPhone := payload.Contact
+		if strings.HasPrefix(toPhone, "0") {
+			toPhone = "+254" + toPhone[1:]
+		}
 
-	customerMessage := []byte(fmt.Sprintf("To: %s\r\n"+
-		"Subject: Logistics Notification - Order Movement Active\r\n\r\n"+
-		"Hello %s,\n\nGood news! Your delivery agent (%s) has started handling your asset route.\n"+
-		"Task details assigned by Logistics Manager: \"%s\"\r\n",
-		customerEmail, payload.Customer, payload.Recipient, payload.Body))
+		smsBody := fmt.Sprintf("Alert to %s: %s (Context: %s)", payload.Recipient, payload.Body, payload.Customer)
 
-	// Execute real email dispatch to Driver
-	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, fromEmail, []string{driverEmail}, driverMessage)
-	if err != nil {
-		log.Println("Driver email transmission failed:", err)
-		http.Error(w, "Failed to send notification to driver", http.StatusInternalServerError)
-		return
+		apiURL := "https://api.africastalking.com/version1/messaging"
+		if isSandbox {
+			apiURL = "https://api.sandbox.africastalking.com/version1/messaging"
+		}
+
+		data := url.Values{}
+		data.Set("username", atUsername)
+		data.Set("to", toPhone)
+		data.Set("message", smsBody)
+
+		req, err := http.NewRequest("POST", apiURL, strings.NewReader(data.Encode()))
+		if err != nil {
+			log.Println("SMS Request Prep Error:", err)
+			http.Error(w, "Failed to prep SMS gateway request", http.StatusInternalServerError)
+			return
+		}
+
+		req.Header.Add("apiKey", atAPIKey)
+		req.Header.Add("Accept", "application/json")
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Println("SMS Gateway Delivery Error:", err)
+			http.Error(w, "SMS Gateway offline", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+			log.Printf("SMS Gateway rejected request with status: %d\n", resp.StatusCode)
+			http.Error(w, "Gateway credentials invalid or rejected by telecom host.", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[LIVE SMS SENT SUCCESSFULLY] Routed real message to: %s\n", toPhone)
 	}
 
-	// Execute real email dispatch to Customer
-	err = smtp.SendMail(smtpHost+":"+smtpPort, auth, fromEmail, []string{customerEmail}, customerMessage)
-	if err != nil {
-		log.Println("Customer email transmission failed:", err)
-		http.Error(w, "Failed to send notification to customer", http.StatusInternalServerError)
-		return
-	}
-
-	// Return clean verification back to our frontend terminal log
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"success","message":"Real-world dual email dispatches delivered successfully!"}`))
+	w.Write([]byte(`{"status":"success","message":"Logistics movement transmission completed cleanly."}`))
 }

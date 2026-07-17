@@ -1,34 +1,456 @@
-function handleMessageSubmit(e) {
-    e.preventDefault();
-    const recipient = document.getElementById('msgRecipient').value;
-    const channel = document.getElementById('msgChannel').value;
-    const customer = document.getElementById('msgCustomer').value || "N/A";
-    const body = document.getElementById('msgBody').value;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobikey MAN Truck & Bus Fleet Control</title>
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: rgba(21, 31, 50, 0.85); /* Slightly translucent to see the background */
+            --bg-input: #0f172a;
+            --primary: #ffcc00; /* MAN / Mobikey Corporate Accent gold/yellow color */
+            --primary-glow: rgba(255, 204, 0, 0.25);
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --border: #24334d;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            /* Full stretch high-res original Mobikey MAN background image */
+            background: linear-gradient(rgba(11, 15, 25, 0.82), rgba(11, 15, 25, 0.85)), url('https://www.mobikeyman.co.ke/fotos/11/imagens_ambiente/img_amb_mobikey_17407423215b698628b86be_950583815b840190a5055.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 24px; 
+            letter-spacing: -0.01em;
+            min-height: 100vh;
+        }
+        
+        .container { max-width: 1400px; margin: 0 auto; }
+        
+        header { 
+            background: var(--bg-card); 
+            padding: 20px 28px; 
+            border-radius: 12px; 
+            border: 1px solid var(--border); 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 24px; 
+            backdrop-filter: blur(10px); /* Beautiful modern blurry backing glass effect */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
 
-    logActivity(`[PENDING] Requesting real email server dispatches...`);
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
 
-    if (isOfflineMode) {
-        logActivity(`[OFFLINE DEMO] Dispatched message to ${recipient}. Email pipeline requires Live API mode.`);
-        return;
-    }
+        .man-badge {
+            background: #0d233a;
+            color: #ffffff;
+            font-weight: 900;
+            padding: 6px 14px;
+            border-radius: 4px;
+            border: 2px solid #ffcc00;
+            letter-spacing: 2px;
+            font-size: 18px;
+            text-transform: uppercase;
+        }
+        
+        .grid { display: grid; grid-template-columns: 1fr 2.5fr; gap: 24px; }
+        @media (max-width: 1024px) { .grid { grid-template-columns: 1fr; } }
+        
+        .card { 
+            background: var(--bg-card); 
+            padding: 28px; 
+            border-radius: 12px; 
+            border: 1px solid var(--border); 
+            margin-bottom: 24px; 
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
+        }
+        
+        h2 { 
+            margin-top: 0; 
+            font-size: 15px; 
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border); 
+            padding-bottom: 14px; 
+            color: var(--primary); 
+            margin-bottom: 20px;
+        }
+        
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.03em; }
+        
+        input, select, textarea { 
+            width: 100%; 
+            padding: 12px 14px; 
+            background: var(--bg-input); 
+            border: 1px solid var(--border); 
+            border-radius: 8px; 
+            color: white; 
+            font-size: 14px;
+            box-sizing: border-box; 
+            transition: all 0.2s ease;
+        }
+        textarea { resize: vertical; font-family: inherit; }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+        
+        button { 
+            background: var(--primary); 
+            color: #000000; 
+            border: none; 
+            padding: 14px; 
+            border-radius: 8px; 
+            font-weight: 800; 
+            font-size: 14px;
+            cursor: pointer; 
+            width: 100%; 
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+        button:hover { opacity: 0.95; transform: translateY(-1px); background-color: #ffe066; }
+        button:active { transform: translateY(0); }
+        
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 14px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-input); color: #cbd5e1; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        td { color: #f1f5f9; }
+        tr:hover td { background: rgba(255, 255, 255, 0.03); }
+        
+        .badge { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-block; }
+        .role-supervisor { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .role-longhaul { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+        .role-lastmile { background: rgba(245, 158, 11, 0.15); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
+        .role-loader { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3); }
+        
+        .status-container { display: flex; align-items: center; gap: 8px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        
+        .action-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; cursor: pointer; font-weight: 600; background: transparent; color: white; transition: all 0.2s ease; }
+        .btn-edit { color: var(--warning); border-color: rgba(245, 158, 11, 0.4); }
+        .btn-edit:hover { background: rgba(245, 158, 11, 0.15); border-color: var(--warning); }
+        .btn-del { color: var(--danger); border-color: rgba(239, 68, 68, 0.4); }
+        .btn-del:hover { background: rgba(239, 68, 68, 0.15); border-color: var(--danger); }
+        
+        .mode-toggle { background: #1e293b; border: 1px solid var(--border); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .mode-toggle:hover { border-color: var(--primary); color: var(--primary); }
+        
+        .history-feed { max-height: 200px; overflow-y: auto; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: monospace; font-size: 13px; }
+        .history-item { padding: 6px 0; border-bottom: 1px solid #1e293b; color: #a7f3d0; display: flex; gap: 8px; }
+        .history-item:last-child { border-bottom: none; }
+        .history-item span { color: var(--text-muted); flex-shrink: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <div class="man-badge">MAN</div>
+                <div>
+                    <h1 style="margin:0; font-size:22px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">MOBIKEY FLEET COMMAND</h1>
+                    <p style="margin:4px 0 0 0; font-size:12px; color:var(--primary); font-weight:600; text-transform:uppercase; letter-spacing:1px;">Official East Africa Transport Logistics Engine</p>
+                </div>
+            </div>
+            <div>
+                <button class="mode-toggle" id="connectionMode" onclick="toggleOfflineMode()">System Status: Live API Connected</button>
+            </div>
+        </header>
+        <div class="grid">
+            <!-- Left Side Control Panel -->
+            <div>
+                <div class="card">
+                    <h2 id="formTitle">Register Heavy Transport Asset</h2>
+                    <form id="driverForm" onsubmit="handleFormSubmit(event)">
+                        <input type="hidden" id="driverId">
+                        <div class="form-group">
+                            <label>Personnel Full Name</label>
+                            <input type="text" id="driverName" required placeholder="e.g. Ibrahim Samwel">
+                        </div>
+                        <div class="form-group">
+                            <label>MAN Logistics Domain</label>
+                            <select id="driverRole">
+                                <option value="Fleet Supervisor">Fleet Supervisor</option>
+                                <option value="Long-Haul Trucker">Long-Haul Heavy Driver</option>
+                                <option value="Last-Mile Delivery">Last-Mile Distribution</option>
+                                <option value="Warehouse Loader">Cargo Handling Agent</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Active Route Task Assignment</label>
+                            <input type="text" id="driverTask" required placeholder="e.g. Loading at Mombasa Port">
+                        </div>
+                        <div class="form-group">
+                            <label>Deployment Status</label>
+                            <select id="driverStatus">
+                                <option value="Active">Active</option>
+                                <option value="Idle">Idle</option>
+                                <option value="Off-Duty">Off-Duty</option>
+                            </select>
+                        </div>
+                        <button type="submit" id="submitBtn">Deploy Logistics Asset</button>
+                        <button type="button" id="cancelBtn" style="background:#334155; color:white; margin-top:8px; display:none;" onclick="resetForm()">Cancel Update</button>
+                    </form>
+                </div>
 
-    // Connect directly to your upgraded Go API engine
-    fetch('http://127.0.0.1:8080/api/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient, channel, customer, body })
-    })
-    .then(res => {
-        if (!res.ok) throw new Error("Server transmission error");
-        return res.json();
-    })
-    .then(data => {
-        logActivity(`[LIVE DISPATCH COMPLETE] Alerts fired securely to driver (${recipient}) and customer (${customer}) inbox arrays.`);
-        document.getElementById('msgCustomer').value = '';
-        document.getElementById('msgBody').value = '';
-        document.getElementById('msgRecipient').selectedIndex = 0;
-    })
-    .catch(err => {
-        logActivity(`[ERROR] Transmission pipeline failed. Verify Go logs or SMTP parameters.`);
-    });
-}
+                <div class="card">
+                    <h2>MOBIKEY COMMUNICATIONS</h2>
+                    <form id="messageForm" onsubmit="handleMessageSubmit(event)">
+                        <div class="form-group">
+                            <label>Target Recipient Name</label>
+                            <input type="text" id="msgRecipient" required placeholder="Type driver name...">
+                        </div>
+                        <div class="form-group">
+                            <label>Channel Gateway</label>
+                            <select id="msgChannel" onchange="updateContactPlaceholder()">
+                                <option value="Email">Enterprise Email (SMTP)</option>
+                                <option value="SMS">SMS Mobile Network</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label id="contactLabel">Recipient Email Address</label>
+                            <input type="text" id="msgContactDetail" required placeholder="e.g. name@domain.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Customer Delivery Contact</label>
+                            <input type="text" id="msgCustomer" placeholder="e.g. Waybill / Order Ref #">
+                        </div>
+                        <div class="form-group">
+                            <label>Manifest / Routing Update Message</label>
+                            <textarea id="msgBody" rows="3" required placeholder="Enter active job instructions or delivery milestones..."></textarea>
+                        </div>
+                        <button type="submit" style="background: var(--success); color: #000000;">Transmit Operational Alert</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Side Dashboard Registries -->
+            <div>
+                <div class="card">
+                    <h2>Active MAN Registry (Real-Time CRUD Tracking)</h2>
+                    <div style="overflow-x: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Driver Asset</th>
+                                    <th>Operational Role</th>
+                                    <th>Assigned Delivery Task</th>
+                                    <th>Status</th>
+                                    <th>Last GPS Location</th>
+                                    <th>Management Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fleetTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card">
+                    <h2>MOBIKEY Operations History & Audit Feed</h2>
+                    <div class="history-feed" id="historyLog">
+                        <div class="history-item"><span>[SYSTEM INITIALIZATION]</span> Connection established with tracking layer telemetry endpoints.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const API_URL = 'http://127.0.0.1:8080/api/drivers'\;
+        let isOfflineMode = false;
+        let localOfflineDrivers = [
+            {id: 1, name: "Ibrah Samwel", role: "Fleet Supervisor", assigned_task: "Overseeing Kisumu Hub Routes", status: "Active", latitude: -0.0917, longitude: 34.7680},
+            {id: 2, name: "Karis", role: "Long-Haul Trucker", assigned_task: "Transit: Nairobi to Malaba Border", status: "Active", latitude: -0.0932, longitude: 34.7695}
+        ];
+
+        function logActivity(message) {
+            const container = document.getElementById('historyLog');
+            const time = new Date().toLocaleTimeString();
+            const logRow = document.createElement('div');
+            logRow.className = 'history-item';
+            logRow.innerHTML = `<span>[${time}]</span> ${message}`;
+            container.insertBefore(logRow, container.firstChild);
+        }
+
+        function updateContactPlaceholder() {
+            const channel = document.getElementById('msgChannel').value;
+            const label = document.getElementById('contactLabel');
+            const input = document.getElementById('msgContactDetail');
+            if (channel === 'Email') {
+                label.innerText = "Recipient Email Address";
+                input.placeholder = "e.g. name@domain.com";
+            } else {
+                label.innerText = "Recipient Mobile Number";
+                input.placeholder = "e.g. +2547XXXXXXXX";
+            }
+        }
+
+        function toggleOfflineMode() {
+            isOfflineMode = !isOfflineMode;
+            const btn = document.getElementById('connectionMode');
+            btn.innerText = isOfflineMode ? "System Status: Local Client Demo (Offline Mode)" : "System Status: Live API Connected";
+            btn.style.borderColor = isOfflineMode ? "var(--warning)" : "var(--border)";
+            logActivity(`Switched network state. Offline mode: ${isOfflineMode}`);
+            loadDrivers();
+        }
+
+        function loadDrivers() {
+            if (isOfflineMode) { renderTable(localOfflineDrivers); return; }
+            fetch(API_URL)
+                .then(res => res.json())
+                .then(data => renderTable(data))
+                .catch(() => {
+                    if (!isOfflineMode) { isOfflineMode = true; document.getElementById('connectionMode').innerText = "System Status: Local Client Demo (Offline Mode)"; }
+                    renderTable(localOfflineDrivers);
+                });
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('fleetTableBody');
+            tbody.innerHTML = '';
+            data.forEach(d => {
+                let roleClass = d.role.includes("Supervisor") ? 'role-supervisor' : d.role.includes("Long-Haul") ? 'role-longhaul' : d.role.includes("Loader") ? 'role-loader' : 'role-lastmile';
+                let dotColor = d.status === 'Active' ? 'var(--success)' : d.status === 'Idle' ? 'var(--warning)' : 'var(--text-muted)';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${d.name}</strong></td>
+                    <td><span class="badge ${roleClass}">${d.role}</span></td>
+                    <td>${d.assigned_task}</td>
+                    <td>
+                        <div class="status-container">
+                            <span class="status-dot" style="background: ${dotColor}; box-shadow: 0 0 8px ${dotColor};"></span>
+                            <span>${d.status}</span>
+                        </div>
+                    </td>
+                    <td style="font-family: monospace; font-size:12px; color: #94a3b8;">${d.latitude.toFixed(4)}, ${d.longitude.toFixed(4)}</td>
+                    <td>
+                        <button class="action-btn btn-edit" style="margin-right: 4px;" onclick="editDriver(${d.id}, '${d.name}', '${d.role}', '${d.assigned_task}', '${d.status}')">Modify</button>
+                        <button class="action-btn btn-del" onclick="deleteDriver(${d.id}, '${d.name}')">Remove</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('driverId').value;
+            const name = document.getElementById('driverName').value;
+            const role = document.getElementById('driverRole').value;
+            const task = document.getElementById('driverTask').value;
+            const status = document.getElementById('driverStatus').value;
+            const payload = { name, role, assigned_task: task, status, latitude: -0.092, longitude: 34.76 };
+            if (id) {
+                if (isOfflineMode) {
+                    let idx = localOfflineDrivers.findIndex(x => x.id == id);
+                    localOfflineDrivers[idx] = { ...localOfflineDrivers[idx], role, assigned_task: task, status };
+                    logActivity(`[OFFLINE] Profile modified for worker: ${localOfflineDrivers[idx].name}`);
+                    resetForm(); loadDrivers();
+                } else {
+                    fetch(`${API_URL}/action?id=${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }).then(() => { logActivity(`[API] Remote updates pushed successfully for worker profile.`); resetForm(); loadDrivers(); });
+                }
+            } else {
+                if (isOfflineMode) {
+                    const newAsset = { id: Date.now(), name, role, assigned_task: task, status, latitude: -0.0917, longitude: 34.7680 };
+                    localOfflineDrivers.push(newAsset);
+                    logActivity(`[OFFLINE] Deployed brand new logistics asset: ${name} as ${role}`);
+                    resetForm(); loadDrivers();
+                } else {
+                    fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    }).then(() => { logActivity(`[API] Created and synchronized worker profile on server database: ${name}`); resetForm(); loadDrivers(); });
+                }
+            }
+        }
+
+        function handleMessageSubmit(e) {
+            e.preventDefault();
+            const recipient = document.getElementById('msgRecipient').value;
+            const channel = document.getElementById('msgChannel').value;
+            const contact = document.getElementById('msgContactDetail').value;
+            const customer = document.getElementById('msgCustomer').value || "N/A";
+            const body = document.getElementById('msgBody').value;
+            logActivity(`[PENDING] Requesting live network transmission to ${contact}...`);
+            if (isOfflineMode) {
+                logActivity(`[OFFLINE DEMO] Dispatched to ${recipient} via ${channel} (${contact})`);
+                return;
+            }
+            fetch('http://127.0.0.1:8080/api/dispatch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recipient, channel, contact, customer, body })
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("Server transmission error");
+                return res.json();
+            })
+            .then(data => {
+                logActivity(`[LIVE DISPATCH COMPLETE] Alert processed successfully via ${channel} network gateway.`);
+                document.getElementById('msgRecipient').value = '';
+                document.getElementById('msgContactDetail').value = '';
+                document.getElementById('msgCustomer').value = '';
+                document.getElementById('msgBody').value = '';
+            })
+            .catch(err => {
+                logActivity(`[ERROR] Transmission pipeline failed. Verify your Go engine setup.`);
+            });
+        }
+
+        function editDriver(id, name, role, task, status) {
+            document.getElementById('formTitle').innerText = "Modify Operational Profile";
+            document.getElementById('driverId').value = id;
+            document.getElementById('driverName').value = name;
+            document.getElementById('driverName').disabled = true;
+            document.getElementById('driverRole').value = role;
+            document.getElementById('driverTask').value = task;
+            document.getElementById('driverStatus').value = status;
+            document.getElementById('submitBtn').innerText = "Commit Profile Updates";
+            document.getElementById('cancelBtn').style.display = "block";
+            logActivity(`Loaded form edit buffers for asset: ${name}`);
+        }
+
+        function deleteDriver(id, name) {
+            if (isOfflineMode) {
+                localOfflineDrivers = localOfflineDrivers.filter(x => x.id != id);
+                logActivity(`[OFFLINE] Terminated assignment and deleted asset registry: ${name}`);
+                loadDrivers();
+            } else {
+                fetch(`${API_URL}/action?id=${id}`, { method: 'DELETE' }).then(() => { logActivity(`[API] Purged asset index ${id} permanently from backend router layer.`); loadDrivers(); });
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('formTitle').innerText = "Register Heavy Transport Asset";
+            document.getElementById('driverId').value = '';
+            document.getElementById('driverName').value = '';
+            document.getElementById('driverName').disabled = false;
+            document.getElementById('driverTask').value = '';
+            document.getElementById('submitBtn').innerText = "Deploy Logistics Asset";
+            document.getElementById('cancelBtn').style.display = "none";
+        }
+        loadDrivers();
+    </script>
+</body>
+</html>
