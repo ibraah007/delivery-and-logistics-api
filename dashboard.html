@@ -168,7 +168,7 @@
         }
         
         #map {
-            height: 400px;
+            height: 440px;
             width: 100%;
             border-radius: 8px;
             border: 1px solid var(--border);
@@ -348,7 +348,7 @@
                 <!-- REAL-TIME DISPATCH MAP CARD -->
                 <div class="card">
                     <h2>
-                        Real-Time Satellite Dispatch Stream 
+                        Real-Time Active Tracking Stream
                         <span class="pulse-indicator"></span>
                     </h2>
                     <div id="map"></div>
@@ -392,12 +392,19 @@
         let currentPinInput = "";
         let map = null;
         let markers = {};
+        let routes = {}; // Store track history lines
         let initialDirectivesCount = 0;
 
-        // Mock Initial Coordinates in Western Kenya Transit Corridors (Kisumu, Malaba, Eldoret)
+        // Custom path routes targeting real corridors across western regions
         let mockVehicles = {
-            "Ibrahim": { lat: -0.0917, planetLng: 34.7680, name: "Ibrahim Samwel", model: "Audi Q7 Quattro", role: "Manager", task: "Route Optimization Audit", speedLat: 0.0002, speedLng: 0.0001 },
-            "Sarah": { lat: 0.6382, planetLng: 34.2796, name: "Sarah Nafula", model: "MAN TGX Semi-Truck", role: "Professional Route Driver", task: "Malaba Border Clearance", speedLat: -0.0001, speedLng: 0.0003 }
+            "Ibrahim": { 
+                lat: -0.0917, lng: 34.7680, name: "Ibrahim Samwel", model: "Audi Q7 Quattro", role: "Fleet Manager", 
+                task: "Route Optimization Audit", speedLat: 0.004, speedLng: 0.003, steps: 0, maxSteps: 40, color: '#ffcc00' 
+            },
+            "Sarah": { 
+                lat: 0.4000, lng: 34.4000, name: "Sarah Nafula", model: "MAN TGX Semi-Truck", role: "Professional Route Driver", 
+                task: "Malaba Border Clearance", speedLat: 0.005, speedLng: -0.002, steps: 0, maxSteps: 50, color: '#38bdf8' 
+            }
         };
 
         // Pin Terminal Matrix Mechanics
@@ -455,16 +462,14 @@
             const region = document.getElementById('mgrRegion').value.trim() || "Kisumu Hub";
             const limit = document.getElementById('mgrLimit').value || "45";
 
-            // Update DOM layout values
             document.getElementById('kpiManagerName').innerText = name;
             document.getElementById('kpiManagerRegion').innerText = region;
             document.getElementById('kpiManagerLimit').innerText = limit + " Units";
 
-            // Log parameters modification event
             const log = document.getElementById('historyLog');
             const item = document.createElement('div');
             item.className = 'history-item';
-            item.innerHTML = `<span>[METRICS CHANGE]</span> Owner authorized modifications. Core Manager context updated.`;
+            item.innerHTML = `<span>[METRICS CHANGE]</span> Core Manager context updated.`;
             log.insertBefore(item, log.firstChild);
 
             toggleProfileEdit();
@@ -474,8 +479,8 @@
         function initLiveMap() {
             if (map) return;
             
-            // Centering layout configuration directly over Western Kenya Network coordinates
-            map = L.map('map').setView([0.2000, 34.5000], 8);
+            // Focus over Western region hubs
+            map = L.map('map').setView([0.2000, 34.6000], 8);
             
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 18,
@@ -485,19 +490,22 @@
             // Populate initial tracking coordinates onto workspace framework
             Object.keys(mockVehicles).forEach(key => {
                 const data = mockVehicles[key];
-                addVehicleToUI(data.name, data.role, data.model, data.task, data.lat, data.planetLng ? data.planetLng : 34.7680);
+                addVehicleToUI(data.name, data.role, data.model, data.task, data.lat, data.lng, data.color);
             });
 
-            // Engage Automated Core Telemetry Live Processing Module Loops
-            setInterval(streamGpsTelemetryDeltas, 2000);
+            // Set a fast, responsive telemetry loop update speed (every 1 second)
+            setInterval(streamGpsTelemetryDeltas, 1000);
         }
 
-        function addVehicleToUI(lead, role, model, category, lat, lng) {
-            // Build dynamic UI maps markers tracking indices mapping structures
+        function addVehicleToUI(lead, role, model, category, lat, lng, trackColor) {
+            // Build map marker with popups
             const marker = L.marker([lat, lng]).addTo(map)
-                .bindPopup(`<b>${lead}</b> (${role})<br>${model}<br>Objective: ${category}`);
+                .bindPopup(`<b>${lead}</b> (${role})<br>Asset: ${model}<br>Destination: ${category}`);
             
             markers[lead] = marker;
+
+            // Initialize route trace line for the vehicle
+            routes[lead] = L.polyline([[lat, lng]], {color: trackColor || '#10b981', weight: 3, opacity: 0.7}).addTo(map);
 
             // Push into administrative activity grid tracking tables
             const tbody = document.getElementById('directivesTableBody');
@@ -505,7 +513,7 @@
             tr.id = `row-${lead.replace(/\s+/g, '-')}`;
             tr.innerHTML = `
                 <td><strong>${lead}</strong><br><small style="color: var(--text-muted)">${role}</small></td>
-                <td><span class="badge dept-custom">En Route</span></td>
+                <td><span class="badge dept-custom">Transit</span></td>
                 <td>${model}</td>
                 <td>${category}</td>
             `;
@@ -522,30 +530,32 @@
             const vehicle = document.getElementById('taskVehicle').value.trim();
             const category = document.getElementById('taskCategory').value.trim();
             
-            // Inject random tracking base alignment if driver has no historical GPS coordinate mappings
+            const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+
             if (!mockVehicles[lead]) {
                 mockVehicles[lead] = {
-                    lat: -0.0917 + (Math.random() - 0.5) * 0.4,
-                    planetLng: 34.7680 + (Math.random() - 0.5) * 0.4,
+                    lat: -0.0917 + (Math.random() - 0.5) * 0.3,
+                    lng: 34.7680 + (Math.random() - 0.5) * 0.3,
                     name: lead,
                     role: role,
                     model: vehicle,
                     task: category,
-                    speedLat: (Math.random() - 0.5) * 0.0004,
-                    speedLng: (Math.random() - 0.5) * 0.0004
+                    speedLat: (Math.random() - 0.5) * 0.008,
+                    speedLng: (Math.random() - 0.5) * 0.008,
+                    steps: 0,
+                    maxSteps: 35,
+                    color: randomColor
                 };
             }
 
-            addVehicleToUI(lead, role, vehicle, category, mockVehicles[lead].lat, mockVehicles[lead].planetLng);
+            addVehicleToUI(lead, role, vehicle, category, mockVehicles[lead].lat, mockVehicles[lead].lng, randomColor);
 
-            // Log pipeline dispatch event
             const log = document.getElementById('historyLog');
             const item = document.createElement('div');
             item.className = 'history-item';
-            item.innerHTML = `<span>[DISPATCH]</span> Deployed ${lead} (${role}) driving ${vehicle} to ${category}. Tracking linked.`;
+            item.innerHTML = `<span>[DISPATCH]</span> Deployed ${lead} (${role}) driving ${vehicle}. Tracking linked.`;
             log.insertBefore(item, log.firstChild);
 
-            // Clean data values
             document.getElementById('taskLead').value = '';
             document.getElementById('taskCategory').value = '';
             document.getElementById('taskDetail').value = '';
@@ -557,20 +567,31 @@
             
             Object.keys(mockVehicles).forEach(key => {
                 let v = mockVehicles[key];
-                // Increment position metrics by speed constants
+                
+                // Advance position metrics
                 v.lat += v.speedLat;
-                if(v.planetLng) v.planetLng += v.speedLng;
+                v.lng += v.speedLng;
+                v.steps++;
 
-                // Move Leaflet map layer vectors markers smoothly dynamically
-                if (markers[v.name]) {
-                    markers[v.name].setLatLng([v.lat, v.planetLng ? v.planetLng : 34.7680]);
+                // Turn around boundary engine to simulate dynamic driving cycles loops
+                if (v.steps >= v.maxSteps) {
+                    v.speedLat = -v.speedLat;
+                    v.speedLng = -v.speedLng;
+                    v.steps = 0;
                 }
 
-                // Append telemetry alert data feeds dynamically into visual display matrices frames
+                // Move Leaflet map markers smoothly dynamically
+                if (markers[v.name]) {
+                    markers[v.name].setLatLng([v.lat, v.lng]);
+                    // Append new tracking coordinates point onto path polyline trace array
+                    routes[v.name].addLatLng([v.lat, v.lng]);
+                }
+
+                // Log system telemetry data updates periodically
                 if (Math.random() > 0.85) {
                     const updateItem = document.createElement('div');
                     updateItem.className = 'history-item';
-                    updateItem.innerHTML = `<span style="color: var(--info);">[TELEMETRY]</span> Asset ${v.name} (${v.model}) pinged coordinates: [${v.lat.toFixed(4)}, ${(v.planetLng ? v.planetLng : 34.7680).toFixed(4)}]. Status normal.`;
+                    updateItem.innerHTML = `<span style="color: var(--info);">[GPS TRAFFIC]</span> ${v.name} moving normal at coord: [${v.lat.toFixed(4)}, ${v.lng.toFixed(4)}]`;
                     log.insertBefore(updateItem, log.firstChild);
                 }
             });
