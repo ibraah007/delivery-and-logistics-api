@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobikey Smart Driver Portal</title>
+    <style>
+        :root {
+            --bg-main: #060b13;
+            --bg-card: #0f172a;
+            --primary: #ffcc00;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --info: #38bdf8;
+            --border: #1e293b;
+            --text: #f8fafc;
+        }
+
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg-main); color: var(--text); padding: 16px; margin: 0; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+        h2 { margin-top: 0; font-size: 14px; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; }
+
+        label { display: block; font-size: 12px; color: #94a3b8; font-weight: bold; margin-bottom: 6px; }
+        select, input, textarea { width: 100%; background: #090d16; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 8px; box-sizing: border-box; margin-bottom: 12px; font-size: 13px; }
+
+        .btn { width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 13px; border: none; cursor: pointer; margin-bottom: 8px; }
+        .btn-primary { background: var(--primary); color: black; }
+        .btn-warning { background: var(--warning); color: black; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-success { background: var(--success); color: white; }
+
+        .notice-box { background: rgba(56,189,248,0.1); border: 1px solid var(--info); border-radius: 8px; padding: 12px; color: var(--info); font-size: 13px; margin-bottom: 12px; }
+        .sos-status-box { background: rgba(239,68,68,0.15); border: 1px solid var(--danger); border-radius: 8px; padding: 12px; color: #fca5a5; font-size: 13px; margin-bottom: 12px; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 8px; }
+        .checkbox-group input { width: auto; margin: 0; }
+    </style>
+</head>
+<body>
+
+    <!-- VEHICLE & DRIVER REGISTRATION -->
+    <div class="card">
+        <h2>🚚 Driver Vehicle & Shift Setup</h2>
+        <label>Select Vehicle</label>
+        <select id="carId">
+            <option value="CAR-001">CAR-001 (Nairobi Main Truck)</option>
+            <option value="CAR-002">CAR-002 (Mombasa Express)</option>
+            <option value="CAR-003">CAR-003 (Nakuru Van)</option>
+            <option value="CAR-004">CAR-004 (Kisumu Freight)</option>
+        </select>
+
+        <label>Driver Full Name</label>
+        <input type="text" id="driverName" value="Ibrahim Driver" placeholder="Your Name">
+
+        <!-- AI PRE-TRIP DVIR CHECKLIST -->
+        <label style="color: var(--primary); margin-top: 10px;">📋 Digital Pre-Trip Safety Check (DVIR)</label>
+        <div class="checkbox-group"><input type="checkbox" id="chkBrakes" checked> Brakes & Steering Functional</div>
+        <div class="checkbox-group"><input type="checkbox" id="chkTires" checked> Tire Pressure & Treads OK</div>
+        <div class="checkbox-group"><input type="checkbox" id="chkLights" checked> Headlights & Indicators Working</div>
+
+        <button class="btn btn-primary" onclick="clockIn()" style="margin-top:10px;">Complete Check & Clock In</button>
+    </div>
+
+    <!-- LIVE MANAGER DISPATCH NOTIFICATION -->
+    <div class="card" id="jobCard">
+        <h2>📦 Assigned Job Dispatch</h2>
+        <div id="jobDetails" class="notice-box">No active job assigned by manager yet. Standing by...</div>
+        <button class="btn btn-success" id="btnAcceptJob" style="display:none;" onclick="acceptJob()">Accept & Begin Job</button>
+    </div>
+
+    <!-- MANAGER ACKNOWLEDGEMENT RESPONSE BOX -->
+    <div class="card" id="managerResponseCard" style="display:none;">
+        <h2>💬 Manager Direct Dispatch Notes</h2>
+        <div id="managerNoteText" class="sos-status-box">Listening for manager updates...</div>
+    </div>
+
+    <!-- TASK PROGRESS -->
+    <div class="card">
+        <h2>🔄 Delivery Progress</h2>
+        <select id="currentTask">
+            <option value="Cargo Loading">1. Cargo Loading in Progress</option>
+            <option value="En Route to Destination">2. En Route to Destination</option>
+            <option value="At Customer Spot">3. Arrived at Destination</option>
+            <option value="Task Completed">4. Delivery Completed Successfully</option>
+        </select>
+        <button class="btn btn-success" onclick="updateTask()">Send Task Progress</button>
+    </div>
+
+    <!-- EMERGENCY INCIDENT -->
+    <div class="card">
+        <h2>🚨 Report Incident / Emergency</h2>
+        <select id="incidentType">
+            <option value="None">-- No Incident --</option>
+            <option value="Flat Tire">Puncture / Flat Tire</option>
+            <option value="Engine Breakdown">Engine Failure</option>
+            <option value="Traffic Delay">Heavy Traffic Checkpoint</option>
+            <option value="Emergency SOS">🚨 CRITICAL EMERGENCY SOS</option>
+        </select>
+        <textarea id="incidentNotes" rows="2" placeholder="Describe issue or location..."></textarea>
+        <button class="btn btn-danger" onclick="reportIncident()">Send Immediate Report to Manager</button>
+    </div>
+
+    <script>
+        let isClockedIn = false;
+        let dummyLat = -1.286389;
+        let dummyLng = 36.817223;
+        let activeJobData = null;
+
+        function clockIn() {
+            const preTripOk = document.getElementById('chkBrakes').checked && 
+                             document.getElementById('chkTires').checked && 
+                             document.getElementById('chkLights').checked;
+
+            if (!preTripOk) {
+                alert("⚠️ Pre-Trip Safety Failed! You cannot clock in until all checks pass.");
+                return;
+            }
+
+            isClockedIn = true;
+            sendUpdate('ON_DUTY', 'Pre-Trip Passed & Clocked In', 'None', '');
+            alert("✅ Pre-trip DVIR Passed! Clocked in successfully.");
+            setInterval(pollManagerInstructions, 2000);
+        }
+
+        function sendUpdate(status, task, incident, notes) {
+            const carId = document.getElementById('carId').value;
+            const driverName = document.getElementById('driverName').value;
+
+            dummyLat += (Math.random() - 0.5) * 0.003;
+            dummyLng += (Math.random() - 0.5) * 0.003;
+
+            const payload = {
+                car_id: carId,
+                driver_name: driverName,
+                status: status,
+                current_task: task,
+                incident_type: incident || "None",
+                incident_notes: notes || "",
+                pre_trip_passed: true,
+                safety_score: 98,
+                lat: dummyLat,
+                lng: dummyLng,
+                speed: status === 'EN_ROUTE' ? 62.0 : 0.0,
+                heading: 90.0,
+                active_job: activeJobData
+            };
+
+            fetch('/api/driver/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
+
+        function pollManagerInstructions() {
+            const carId = document.getElementById('carId').value;
+            fetch('/api/fleet')
+                .then(res => res.json())
+                .then(data => {
+                    const d = data[carId];
+                    if (!d) return;
+
+                    // Check for Manager Notes
+                    if (d.manager_note) {
+                        document.getElementById('managerResponseCard').style.display = 'block';
+                        document.getElementById('managerNoteText').innerText = d.manager_note;
+                    }
+
+                    // Check for Active Job Assignments
+                    if (d.active_job) {
+                        activeJobData = d.active_job;
+                        const box = document.getElementById('jobDetails');
+                        box.innerHTML = `<strong>Job #${d.active_job.job_id}</strong><br>
+                                         📍 From: ${d.active_job.pickup}<br>
+                                         �� To: ${d.active_job.destination}<br>
+                                         📦 Cargo: ${d.active_job.cargo_type}<br>
+                                         Status: <span style="color:var(--primary);">${d.active_job.status}</span>`;
+
+                        if (d.active_job.status === 'ASSIGNED') {
+                            document.getElementById('btnAcceptJob').style.display = 'block';
+                        } else {
+                            document.getElementById('btnAcceptJob').style.display = 'none';
+                        }
+                    }
+                });
+        }
+
+        function acceptJob() {
+            if (activeJobData) {
+                activeJobData.status = 'ACCEPTED';
+                sendUpdate('EN_ROUTE', `Accepted Job #${activeJobData.job_id}`, 'None', '');
+                alert('Job Accepted! Starting route navigation...');
+            }
+        }
+
+        function updateTask() {
+            if (!isClockedIn) { alert("Clock in first!"); return; }
+            const task = document.getElementById('currentTask').value;
+            sendUpdate(task.includes('Completed') ? 'DELIVERED' : 'EN_ROUTE', task, 'None', '');
+            alert("Progress updated!");
+        }
+
+        function reportIncident() {
+            if (!isClockedIn) { alert("Clock in first!"); return; }
+            const type = document.getElementById('incidentType').value;
+            const notes = document.getElementById('incidentNotes').value;
+            const status = (type === 'Emergency SOS') ? 'SOS_INCIDENT' : 'INCIDENT_REPORTED';
+
+            sendUpdate(status, 'Incident In Progress', type, notes);
+            alert("⚠️ Alert sent to Manager Console!");
+        }
+    </script>
+</body>
+</html>

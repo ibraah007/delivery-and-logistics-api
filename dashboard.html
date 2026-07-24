@@ -1,600 +1,321 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobikey Executive Fleet Command & Live GPS Portal</title>
-    <!-- Leaflet CSS for Map Styling -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <title>Mobikey Executive Manager Command Console</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
         :root {
             --bg-main: #060b13;
-            --bg-card: rgba(15, 23, 42, 0.9);
+            --bg-card: rgba(15, 23, 42, 0.85);
             --bg-input: #090d16;
-            --primary: #ffcc00; 
+            --primary: #ffcc00;
             --danger: #ef4444;
+            --warning: #f59e0b;
             --success: #10b981;
             --info: #38bdf8;
             --border: #1e293b;
             --text-main: #f8fafc;
             --text-muted: #64748b;
         }
-        
+
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background: radial-gradient(circle at top right, #0f172a 0%, #060b13 100%);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            background: radial-gradient(circle at center, #111827 0%, #060b13 100%); 
             color: var(--text-main); 
             margin: 0; 
-            padding: 24px; 
+            padding: 20px; 
+            position: relative;
             min-height: 100vh;
         }
 
-        #authOverlay {
+        /* BACKGROUND SHINING MAN LION LOGO */
+        .bg-watermark {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #060b13;
-            z-index: 99999;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 550px;
+            max-width: 80vw;
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+            filter: drop-shadow(0 0 35px rgba(0, 162, 255, 0.4));
         }
 
-        .pin-box {
-            background: #0f172a;
-            border: 2px solid var(--border);
-            padding: 40px;
-            border-radius: 16px;
-            text-align: center;
-            width: 320px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.7);
-        }
+        #authOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#060b13; z-index:99999; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+        .pin-box { background:#0f172a; border:2px solid var(--border); padding:30px; border-radius:16px; text-align:center; width:300px; }
+        .pin-display { background:var(--bg-input); border:2px solid #334155; border-radius:8px; padding:10px; font-size:24px; color:var(--primary); margin-bottom:20px; font-weight:bold; }
+        .keypad { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+        .key { background:#1e293b; border:1px solid #334155; color:white; padding:15px; font-size:18px; font-weight:bold; border-radius:6px; cursor:pointer; }
+        .key:active { background:var(--primary); color:black; }
 
-        .pin-display {
-            background: var(--bg-input);
-            border: 2px solid #334155;
-            border-radius: 8px;
-            padding: 15px;
-            font-size: 28px;
-            letter-spacing: 10px;
-            color: var(--primary);
-            margin-bottom: 25px;
-            font-weight: bold;
-            height: 35px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+        .container { max-width: 1600px; margin: 0 auto; display: none; position: relative; z-index: 1; }
+        header { background: var(--bg-card); backdrop-filter: blur(8px); padding: 16px 24px; border-radius: 12px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .badge-man { background: #0d233a; color: white; font-weight: 900; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--primary); }
 
-        .keypad {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-        }
-
-        .key {
-            background: #1e293b;
-            border: 1px solid #334155;
-            color: white;
-            padding: 20px;
-            font-size: 22px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            user-select: none;
-        }
-        .key:active { background: var(--primary); color: black; }
-        .key.clear { color: var(--danger); background: #2d1f1f; }
-        .key.enter { color: var(--success); background: #1f2d25; }
-
-        .auth-error {
-            color: var(--danger);
-            font-size: 14px;
-            margin-top: 15px;
-            font-weight: bold;
-            min-height: 20px;
-        }
-        
-        .container { max-width: 1600px; margin: 0 auto; display: none; }
-        
-        header { 
-            background: var(--bg-card); 
-            padding: 24px; 
-            border-radius: 12px; 
-            border: 1px solid var(--border); 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 24px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-
-        .logo-area { display: flex; align-items: center; gap: 15px; }
-        .man-badge {
-            background: #0d233a; color: #ffffff; font-weight: 900; padding: 6px 14px;
-            border-radius: 4px; border: 2px solid var(--primary); letter-spacing: 2px; font-size: 18px; text-transform: uppercase;
-        }
-
-        .kpi-container {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 24px;
-        }
-        .kpi-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px 20px;
-        }
-        .kpi-title { font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 1px; font-weight: 600;}
-        .kpi-value { font-size: 24px; font-weight: 800; margin-top: 5px; color: #ffffff;}
-        
-        .grid { display: grid; grid-template-columns: 1.2fr 2fr; gap: 24px; }
-        @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
-        
-        .card { 
-            background: var(--bg-card); padding: 24px; border-radius: 12px; border: 1px solid var(--border); 
-            margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        }
-        
-        h2 { 
-            margin-top: 0; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-            border-bottom: 1px solid var(--border); padding-bottom: 12px; color: var(--primary); margin-bottom: 20px;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        
-        .form-group { margin-bottom: 16px; }
-        label { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; }
-        
-        input, select, textarea { 
-            width: 100%; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); 
-            border-radius: 6px; color: white; font-size: 14px; box-sizing: border-box;
-        }
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-        input:disabled, select:disabled {
-            background: #0b111a;
-            color: #64748b;
-            cursor: not-allowed;
-        }
-        
-        button.btn-submit { 
-            background: var(--primary); color: black; border: none; padding: 12px; border-radius: 6px; 
-            font-weight: 700; font-size: 13px; cursor: pointer; width: 100%; text-transform: uppercase;
-        }
-        
-        #map {
-            height: 440px;
-            width: 100%;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: #090d16;
-        }
-
-        .pulse-indicator {
-            display: inline-block;
-            width: 8px; height: 8px;
-            background: var(--success);
-            border-radius: 50%;
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
+        .grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
+        .card { background: var(--bg-card); backdrop-filter: blur(8px); padding: 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 20px; }
+        h2 { margin-top: 0; font-size: 13px; text-transform: uppercase; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
 
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
-        th { background: var(--bg-input); color: #94a3b8; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-        
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-        .dept-custom { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
-        .edit-badge { background: #1e293b; color: var(--primary); border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;}
-        
-        .history-feed { max-height: 180px; overflow-y: auto; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; }
-        .history-item { padding: 4px 0; border-bottom: 1px solid #1e293b; color: #cbd5e1; }
-        .history-item span { color: var(--primary); }
-        .btn-logout { background: #1e293b; color: white; padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); cursor: pointer;}
-        
-        .fleet-banner-container {
-            width: 100%;
-            height: 140px;
-            overflow: hidden;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            margin-bottom: 16px;
-        }
-        .fleet-banner-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        th, td { padding: 10px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-input); color: #94a3b8; font-size: 11px; text-transform: uppercase; }
+
+        .tag { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .tag-sos { background: rgba(239,68,68,0.2); color: var(--danger); }
+        .tag-warn { background: rgba(245,158,11,0.2); color: var(--warning); }
+        .tag-ok { background: rgba(16,185,129,0.2); color: var(--success); }
+
+        .btn-action { padding: 6px 10px; border-radius: 4px; border: none; font-weight: bold; font-size: 11px; cursor: pointer; margin-right: 4px; }
+        .btn-ack { background: var(--warning); color: black; }
+        .btn-resolve { background: var(--success); color: white; }
+        .btn-dispatch { background: var(--info); color: black; }
+
+        #map { height: 380px; border-radius: 8px; background: #090d16; }
+        .feed { max-height: 200px; overflow-y: auto; background: var(--bg-input); border: 1px solid var(--border); padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; }
+        .feed-line { padding: 4px 0; border-bottom: 1px solid #1e293b; }
     </style>
 </head>
 <body>
 
-    <!-- PIN SECURITY OVERLAY -->
+    <!-- INLINE SHINING MAN LION LOGO BACKGROUND -->
+    <svg class="bg-watermark" viewBox="0 0 500 350" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="chromeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#e6f0fa" />
+                <stop offset="35%" stop-color="#8a9ba8" />
+                <stop offset="50%" stop-color="#ffffff" />
+                <stop offset="65%" stop-color="#4a5a68" />
+                <stop offset="100%" stop-color="#1e2936" />
+            </linearGradient>
+            <filter id="badgeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="8" result="blur" />
+                <feComponentTransfer in="blur" result="glow1">
+                    <feFuncA type="linear" slope="0.6" />
+                </feComponentTransfer>
+                <feMerge>
+                    <feMergeNode in="glow1" />
+                    <feMergeNode in="SourceGraphic" />
+                </feMerge>
+            </filter>
+        </defs>
+        <g filter="url(#badgeGlow)">
+            <path d="M 50 40 L 450 40 C 450 160 380 270 250 310 C 120 270 50 160 50 40 Z" fill="none" stroke="url(#chromeGradient)" stroke-width="12" stroke-linejoin="round"/>
+            <path d="M 68 56 L 432 56 C 432 165 368 258 250 294 C 132 258 68 165 68 56 Z" fill="rgba(15, 23, 42, 0.85)" stroke="url(#chromeGradient)" stroke-width="4"/>
+            <g fill="url(#chromeGradient)">
+                <path d="M 235 90 C 245 82 265 82 275 92 C 285 102 280 115 292 120 C 302 122 312 112 320 125 C 326 135 315 145 322 155 C 328 162 338 165 335 178 C 330 190 315 188 308 198 C 300 208 305 220 295 228 C 285 235 272 222 260 230 C 250 238 248 250 235 248 C 225 245 228 230 218 222 C 210 215 198 220 190 210 C 182 200 195 190 190 180 C 185 172 172 170 175 158 C 178 148 190 148 195 138 C 200 128 190 118 200 108 C 210 98 222 102 235 90 Z" />
+                <path d="M 285 145 L 340 130 L 325 150 L 350 155 L 310 178 Z" />
+                <path d="M 185 185 C 160 170 150 140 162 115 C 168 102 178 95 175 88 C 170 82 155 95 148 112 C 135 145 150 190 180 208 Z" />
+            </g>
+            <rect x="120" y="250" width="260" height="35" rx="6" fill="url(#chromeGradient)" />
+            <text x="250" y="276" fill="#0f172a" font-size="24" font-weight="900" font-family="Arial, sans-serif" text-anchor="middle" letter-spacing="6">MAN</text>
+        </g>
+    </svg>
+
+    <!-- AUTHENTICATION -->
     <div id="authOverlay">
-        <div class="man-badge" style="margin-bottom: 20px;">MAN</div>
-        <h1 style="margin:0 0 5px 0; font-size: 22px; text-transform: uppercase; color: white;">Executive Gateway</h1>
-        <p style="margin:0 0 25px 0; font-size: 14px; color: var(--text-muted);">Enter Manager / Owner Verification PIN</p>
-        
         <div class="pin-box">
+            <span class="badge-man">MAN</span>
+            <h2 style="color:white; border:none; margin:10px 0;">Manager Console</h2>
             <div class="pin-display" id="pinDisplay">---</div>
             <div class="keypad">
-                <button type="button" class="key" onclick="pressKey('1')">1</button>
-                <button type="button" class="key" onclick="pressKey('2')">2</button>
-                <button type="button" class="key" onclick="pressKey('3')">3</button>
-                <button type="button" class="key" onclick="pressKey('4')">4</button>
-                <button type="button" class="key" onclick="pressKey('5')">5</button>
-                <button type="button" class="key" onclick="pressKey('6')">6</button>
-                <button type="button" class="key" onclick="pressKey('7')">7</button>
-                <button type="button" class="key" onclick="pressKey('8')">8</button>
-                <button type="button" class="key" onclick="pressKey('9')">9</button>
-                <button type="button" class="key" onclick="clearPin()">CLR</button>
-                <button type="button" class="key" onclick="pressKey('0')">0</button>
-                <button type="button" class="key enter" onclick="verifyPin()">ENT</button>
+                <button class="key" onclick="press('1')">1</button>
+                <button class="key" onclick="press('2')">2</button>
+                <button class="key" onclick="press('3')">3</button>
+                <button class="key" onclick="press('4')">4</button>
+                <button class="key" onclick="press('5')">5</button>
+                <button class="key" onclick="press('6')">6</button>
+                <button class="key" onclick="press('7')">7</button>
+                <button class="key" onclick="press('8')">8</button>
+                <button class="key" onclick="press('9')">9</button>
+                <button class="key" style="color:var(--danger)" onclick="clr()">CLR</button>
+                <button class="key" onclick="press('0')">0</button>
+                <button class="key" style="color:var(--success)" onclick="check()">ENT</button>
             </div>
-            <div class="auth-error" id="authError"></div>
         </div>
     </div>
 
-    <!-- MAIN INTERFACE -->
-    <div class="container" id="mainAppContainer">
+    <!-- MAIN APP -->
+    <div class="container" id="mainApp">
         <header>
-            <div class="logo-area">
-                <div class="man-badge">MAN</div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span class="badge-man">MAN</span>
                 <div>
-                    <h1 style="margin:0; font-size:22px; font-weight:800;">MOBIKEY FLEET COMMAND</h1>
-                    <p style="margin:4px 0 0 0; font-size:11px; color:var(--primary); font-weight:600; text-transform:uppercase; letter-spacing:1px;">Live Core Asset Operations Hub</p>
+                    <h1 style="margin:0; font-size:18px;">MOBIKEY FLEET COMMAND & DISPATCH CENTER</h1>
+                    <small style="color:var(--primary)">Operations Head: Ibrahim Samwel</small>
                 </div>
             </div>
-            <div>
-                <button class="btn-logout" onclick="logoutSystem()">Lock Console</button>
-            </div>
+            <button style="background:#1e293b; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;" onclick="location.reload()">Lock</button>
         </header>
 
-        <!-- KPI SUMMARY RIBBON -->
-        <div class="kpi-container">
-            <div class="kpi-card">
-                <div class="kpi-title">Current Fleet Manager</div>
-                <div class="kpi-value" id="kpiManagerName" style="color: #ffffff; font-size: 18px;">Ibrahim Samwel</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-title">Active Dispatches</div>
-                <div class="kpi-value" id="kpiPendingTasks" style="color: var(--primary);">2 Running</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-title">Current Region</div>
-                <div class="kpi-value" id="kpiManagerRegion" style="color: var(--info); font-size: 18px;">Kisumu Hub</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-title">Max Boundary Limit</div>
-                <div class="kpi-value" id="kpiManagerLimit" style="color: var(--success);">45 Units</div>
-            </div>
-        </div>
-
         <div class="grid">
-            <!-- CONTROLS & OPERATIONS COLUMN -->
             <div>
-                <!-- LIVE FLEET ASSET IMAGE BANNER -->
-                <div class="fleet-banner-container">
-                    <img src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&q=80&w=1200" alt="MAN Heavy Duty Logistics Trucks">
+                <!-- ACTIVE FLEET TABLE -->
+                <div class="card">
+                    <h2>Live Fleet Controls, DVIR & Incident Management</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Driver / Car</th>
+                                <th>DVIR / AI Score</th>
+                                <th>Task / Incident</th>
+                                <th>Manager Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetTable">
+                            <tr><td colspan="4" style="color:var(--text-muted)">Waiting for active drivers...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <!-- DYNAMIC EDITABLE MANAGER PROFILE CARD -->
+                <!-- JOB DISPATCH CONTROLLER -->
                 <div class="card">
-                    <h2>
-                        Manager Parameters Configuration
-                        <button id="profileEditBtn" class="edit-badge" onclick="toggleProfileEdit()">Modify Parameters</button>
-                    </h2>
-                    <form id="managerProfileForm" onsubmit="saveManagerProfile(event)">
-                        <div class="form-group">
-                            <label>Manager Full Name</label>
-                            <input type="text" id="mgrName" value="Ibrahim Samwel" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label>Operational Hub / Region Location</label>
-                            <input type="text" id="mgrRegion" value="Kisumu Hub" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label>Max Tracked Vehicle Limit Allocation</label>
-                            <input type="number" id="mgrLimit" value="45" disabled>
-                        </div>
-                        <div id="profileSaveContainer" style="display: none;">
-                            <button type="submit" class="btn-submit" style="background: var(--success); color: black;">Commit Profile Parameters</button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- FLEET ACTION ROUTING DIRECTIVES -->
-                <div class="card">
-                    <h2>Deploy Fleet Driver & Asset</h2>
-                    <form id="directiveForm" onsubmit="handleDirectiveSubmit(event)">
-                        <div class="form-group">
-                            <label>Driver / Staff Name</label>
-                            <input type="text" id="taskLead" placeholder="Enter full name" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Operational Role Assignment</label>
-                            <input type="text" id="taskRole" placeholder="e.g. Professional Route Driver, Logistics Specialist" value="Professional Route Driver" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Target Fleet Asset Model</label>
-                            <input type="text" id="taskVehicle" placeholder="e.g. MAN TGX Semi-Truck, Porsche Cayenne Turbo" value="MAN TGX Semi-Truck" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Operational Objective / Route Destination</label>
-                            <input type="text" id="taskCategory" placeholder="e.g. Malaba Border Customs, Bus Route 102" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Trip Orders & Fleet Manifest Notes</label>
-                            <input type="text" id="taskDetail" placeholder="Special route instructions...">
-                        </div>
-                        <button type="submit" class="btn-submit">Dispatch Asset</button>
-                    </form>
+                    <h2>📦 Dispatch New Delivery Task to Driver</h2>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                        <select id="dispatchCarId" style="background:#090d16; color:white; border:1px solid #1e293b; padding:8px; border-radius:6px;">
+                            <option value="CAR-001">CAR-001 (Nairobi)</option>
+                            <option value="CAR-002">CAR-002 (Mombasa)</option>
+                            <option value="CAR-003">CAR-003 (Nakuru)</option>
+                            <option value="CAR-004">CAR-004 (Kisumu)</option>
+                        </select>
+                        <input type="text" id="jobCargo" placeholder="Cargo (e.g. Electronics, Medical)" style="background:#090d16; color:white; border:1px solid #1e293b; padding:8px; border-radius:6px;">
+                        <input type="text" id="jobPickup" placeholder="Pickup (e.g. Embakasi Hub)" style="background:#090d16; color:white; border:1px solid #1e293b; padding:8px; border-radius:6px;">
+                        <input type="text" id="jobDestination" placeholder="Destination (e.g. Westlands Mall)" style="background:#090d16; color:white; border:1px solid #1e293b; padding:8px; border-radius:6px;">
+                    </div>
+                    <button class="btn-action btn-dispatch" style="width:100%; padding:10px;" onclick="dispatchJob()">Dispatch Job to Driver Screen</button>
                 </div>
             </div>
 
-            <!-- LIVE MAP & AUDIT GRAPH COLUMN -->
             <div>
-                <!-- REAL-TIME DISPATCH MAP CARD -->
                 <div class="card">
-                    <h2>
-                        Real-Time Active Tracking Stream
-                        <span class="pulse-indicator"></span>
-                    </h2>
+                    <h2>Kenya GPS Fleet Map</h2>
                     <div id="map"></div>
                 </div>
 
-                <!-- LIVE DISPATCH REGISTRY REGION -->
                 <div class="card">
-                    <h2>Active Asset Deployments Registry</h2>
-                    <div style="overflow-x: auto;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Driver / Lead</th>
-                                    <th>Assigned Role</th>
-                                    <th>Vehicle Model</th>
-                                    <th>Mission Objective</th>
-                                </tr>
-                            </thead>
-                            <tbody id="directivesTableBody">
-                                <!-- Elements dynamically managed here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- LIVE TELEMETRY SYSTEM LOGGER -->
-                <div class="card">
-                    <h2>System Audit Trail & Telemetry Feeds</h2>
-                    <div class="history-feed" id="historyLog">
-                        <div class="history-item"><span>[SYSTEM]</span> Encryption key authenticated. Live tracking modules linked.</div>
+                    <h2>Real-Time Operations & Response Feed</h2>
+                    <div class="feed" id="feed">
+                        <div class="feed-line"><span style="color:var(--primary)">[SYSTEM]</span> Portal Online. Awaiting fleet interactions...</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Leaflet Infrastructure JavaScript Component Sourcing -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const MASTER_PIN = "2540"; 
-        let currentPinInput = "";
+        let pin = "";
         let map = null;
         let markers = {};
-        let routes = {}; // Store track history lines
-        let initialDirectivesCount = 0;
 
-        // Custom path routes targeting real corridors across western regions
-        let mockVehicles = {
-            "Ibrahim": { 
-                lat: -0.0917, lng: 34.7680, name: "Ibrahim Samwel", model: "Audi Q7 Quattro", role: "Fleet Manager", 
-                task: "Route Optimization Audit", speedLat: 0.004, speedLng: 0.003, steps: 0, maxSteps: 40, color: '#ffcc00' 
-            },
-            "Sarah": { 
-                lat: 0.4000, lng: 34.4000, name: "Sarah Nafula", model: "MAN TGX Semi-Truck", role: "Professional Route Driver", 
-                task: "Malaba Border Clearance", speedLat: 0.005, speedLng: -0.002, steps: 0, maxSteps: 50, color: '#38bdf8' 
-            }
-        };
-
-        // Pin Terminal Matrix Mechanics
-        function updateDisplay() {
-            const display = document.getElementById('pinDisplay');
-            if (currentPinInput.length === 0) { display.innerText = "---"; } 
-            else { display.innerText = "* ".repeat(currentPinInput.length).trim(); }
-        }
-
-        function pressKey(num) {
-            if (currentPinInput.length < 4) {
-                currentPinInput += num;
-                updateDisplay();
-                if (currentPinInput.length === 4) { setTimeout(verifyPin, 150); }
-            }
-        }
-
-        function clearPin() {
-            currentPinInput = "";
-            updateDisplay();
-            document.getElementById('authError').innerText = "";
-        }
-
-        function verifyPin() {
-            if (currentPinInput === MASTER_PIN) {
+        function press(n) { if (pin.length < 4) { pin += n; document.getElementById('pinDisplay').innerText = "* ".repeat(pin.length); if(pin.length===4) setTimeout(check, 100); } }
+        function clr() { pin = ""; document.getElementById('pinDisplay').innerText = "---"; }
+        function check() {
+            if (pin === "2540") {
                 document.getElementById('authOverlay').style.display = "none";
-                document.getElementById('mainAppContainer').style.display = "block";
-                initLiveMap();
-            } else {
-                document.getElementById('authError').innerText = "INVALID GATEWAY CREDENTIALS.";
-                clearPin();
-            }
+                document.getElementById('mainApp').style.display = "block";
+                init();
+            } else { alert("Invalid PIN. Use 2540"); clr(); }
         }
 
-        function logoutSystem() {
-            document.getElementById('mainAppContainer').style.display = "none";
-            document.getElementById('authOverlay').style.display = "flex";
-            clearPin();
-        }
-
-        // Configuration Module Toggling Logic
-        let isProfileEditing = false;
-        function toggleProfileEdit() {
-            isProfileEditing = !isProfileEditing;
-            const inputs = ['mgrName', 'mgrRegion', 'mgrLimit'];
-            inputs.forEach(id => document.getElementById(id).disabled = !isProfileEditing);
-            
-            document.getElementById('profileSaveContainer').style.display = isProfileEditing ? 'block' : 'none';
-            document.getElementById('profileEditBtn').innerText = isProfileEditing ? 'Lock Form' : 'Modify Parameters';
-        }
-
-        function saveManagerProfile(e) {
-            e.preventDefault();
-            const name = document.getElementById('mgrName').value.trim() || "Ibrahim Samwel";
-            const region = document.getElementById('mgrRegion').value.trim() || "Kisumu Hub";
-            const limit = document.getElementById('mgrLimit').value || "45";
-
-            document.getElementById('kpiManagerName').innerText = name;
-            document.getElementById('kpiManagerRegion').innerText = region;
-            document.getElementById('kpiManagerLimit').innerText = limit + " Units";
-
-            const log = document.getElementById('historyLog');
-            const item = document.createElement('div');
-            item.className = 'history-item';
-            item.innerHTML = `<span>[METRICS CHANGE]</span> Core Manager context updated.`;
-            log.insertBefore(item, log.firstChild);
-
-            toggleProfileEdit();
-        }
-
-        // Live Leaflet Structural Initialization Layer
-        function initLiveMap() {
+        function init() {
             if (map) return;
-            
-            // Focus over Western region hubs
-            map = L.map('map').setView([0.2000, 34.6000], 8);
-            
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 18,
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
+            map = L.map('map').setView([-0.0236, 37.9062], 6.5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            setInterval(poll, 1500);
+        }
 
-            // Populate initial tracking coordinates onto workspace framework
-            Object.keys(mockVehicles).forEach(key => {
-                const data = mockVehicles[key];
-                addVehicleToUI(data.name, data.role, data.model, data.task, data.lat, data.lng, data.color);
+        function triggerManagerAction(carId, action, note) {
+            fetch('/api/manager/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    car_id: carId,
+                    action: action,
+                    manager_note: note || "Manager responded."
+                })
+            }).then(() => poll());
+        }
+
+        function dispatchJob() {
+            const carId = document.getElementById('dispatchCarId').value;
+            const cargo = document.getElementById('jobCargo').value;
+            const pickup = document.getElementById('jobPickup').value;
+            const dest = document.getElementById('jobDestination').value;
+
+            if (!cargo || !pickup || !dest) { alert("Please complete all job details!"); return; }
+
+            const jobPayload = {
+                job_id: "JOB-" + Math.floor(1000 + Math.random() * 9000),
+                cargo_type: cargo,
+                pickup: pickup,
+                destination: dest
+            };
+
+            fetch('/api/manager/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    car_id: carId,
+                    action: "ASSIGN_JOB",
+                    job: jobPayload
+                })
+            }).then(() => {
+                alert(`Job dispatched to ${carId}!`);
+                poll();
             });
-
-            // Set a fast, responsive telemetry loop update speed (every 1 second)
-            setInterval(streamGpsTelemetryDeltas, 1000);
         }
 
-        function addVehicleToUI(lead, role, model, category, lat, lng, trackColor) {
-            // Build map marker with popups
-            const marker = L.marker([lat, lng]).addTo(map)
-                .bindPopup(`<b>${lead}</b> (${role})<br>Asset: ${model}<br>Destination: ${category}`);
-            
-            markers[lead] = marker;
+        function poll() {
+            fetch('/api/fleet')
+                .then(r => r.json())
+                .then(data => {
+                    const tbody = document.getElementById('fleetTable');
+                    const keys = Object.keys(data);
 
-            // Initialize route trace line for the vehicle
-            routes[lead] = L.polyline([[lat, lng]], {color: trackColor || '#10b981', weight: 3, opacity: 0.7}).addTo(map);
+                    if (keys.length > 0) tbody.innerHTML = "";
 
-            // Push into administrative activity grid tracking tables
-            const tbody = document.getElementById('directivesTableBody');
-            const tr = document.createElement('tr');
-            tr.id = `row-${lead.replace(/\s+/g, '-')}`;
-            tr.innerHTML = `
-                <td><strong>${lead}</strong><br><small style="color: var(--text-muted)">${role}</small></td>
-                <td><span class="badge dept-custom">Transit</span></td>
-                <td>${model}</td>
-                <td>${category}</td>
-            `;
-            tbody.insertBefore(tr, tbody.firstChild);
-            initialDirectivesCount++;
-            document.getElementById('kpiPendingTasks').innerText = initialDirectivesCount + " Running";
-        }
+                    keys.forEach(id => {
+                        const d = data[id];
 
-        // Submission Pipeline Interface Parsing Logic
-        function handleDirectiveSubmit(e) {
-            e.preventDefault();
-            const lead = document.getElementById('taskLead').value.trim();
-            const role = document.getElementById('taskRole').value.trim();
-            const vehicle = document.getElementById('taskVehicle').value.trim();
-            const category = document.getElementById('taskCategory').value.trim();
-            
-            const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+                        if (d.lat !== 0 && d.lng !== 0) {
+                            if (!markers[id]) {
+                                markers[id] = L.marker([d.lat, d.lng]).addTo(map).bindPopup(`<b>${d.driver_name}</b><br>${d.car_id}`);
+                            } else {
+                                markers[id].setLatLng([d.lat, d.lng]);
+                            }
+                        }
 
-            if (!mockVehicles[lead]) {
-                mockVehicles[lead] = {
-                    lat: -0.0917 + (Math.random() - 0.5) * 0.3,
-                    lng: 34.7680 + (Math.random() - 0.5) * 0.3,
-                    name: lead,
-                    role: role,
-                    model: vehicle,
-                    task: category,
-                    speedLat: (Math.random() - 0.5) * 0.008,
-                    speedLng: (Math.random() - 0.5) * 0.008,
-                    steps: 0,
-                    maxSteps: 35,
-                    color: randomColor
-                };
-            }
+                        let actionBtns = ``;
+                        if (d.status === 'SOS_INCIDENT' || d.incident_type !== 'None') {
+                            actionBtns = `
+                                <button class="btn-action btn-ack" onclick="triggerManagerAction('${d.car_id}', 'ACK_SOS', 'Help is dispatched by Operations team!')">Ack Incident</button>
+                                <button class="btn-action btn-resolve" onclick="triggerManagerAction('${d.car_id}', 'RESOLVE_SOS', 'Incident Resolved')">Resolve</button>
+                            `;
+                        } else {
+                            actionBtns = `<span style="font-size:11px; color:#64748b;">Normal Operation</span>`;
+                        }
 
-            addVehicleToUI(lead, role, vehicle, category, mockVehicles[lead].lat, mockVehicles[lead].lng, randomColor);
-
-            const log = document.getElementById('historyLog');
-            const item = document.createElement('div');
-            item.className = 'history-item';
-            item.innerHTML = `<span>[DISPATCH]</span> Deployed ${lead} (${role}) driving ${vehicle}. Tracking linked.`;
-            log.insertBefore(item, log.firstChild);
-
-            document.getElementById('taskLead').value = '';
-            document.getElementById('taskCategory').value = '';
-            document.getElementById('taskDetail').value = '';
-        }
-
-        // Live Dynamic Delta Movement Simulation Processing Module Engines
-        function streamGpsTelemetryDeltas() {
-            const log = document.getElementById('historyLog');
-            
-            Object.keys(mockVehicles).forEach(key => {
-                let v = mockVehicles[key];
-                
-                // Advance position metrics
-                v.lat += v.speedLat;
-                v.lng += v.speedLng;
-                v.steps++;
-
-                // Turn around boundary engine to simulate dynamic driving cycles loops
-                if (v.steps >= v.maxSteps) {
-                    v.speedLat = -v.speedLat;
-                    v.speedLng = -v.speedLng;
-                    v.steps = 0;
-                }
-
-                // Move Leaflet map markers smoothly dynamically
-                if (markers[v.name]) {
-                    markers[v.name].setLatLng([v.lat, v.lng]);
-                    // Append new tracking coordinates point onto path polyline trace array
-                    routes[v.name].addLatLng([v.lat, v.lng]);
-                }
-
-                // Log system telemetry data updates periodically
-                if (Math.random() > 0.85) {
-                    const updateItem = document.createElement('div');
-                    updateItem.className = 'history-item';
-                    updateItem.innerHTML = `<span style="color: var(--info);">[GPS TRAFFIC]</span> ${v.name} moving normal at coord: [${v.lat.toFixed(4)}, ${v.lng.toFixed(4)}]`;
-                    log.insertBefore(updateItem, log.firstChild);
-                }
-            });
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong>${d.driver_name}</strong><br><small style="color:var(--primary);">${d.car_id}</small></td>
+                            <td>
+                                <span class="tag ${d.pre_trip_passed ? 'tag-ok' : 'tag-sos'}">${d.pre_trip_passed ? 'DVIR PASSED' : 'NO CHECK'}</span><br>
+                                <small style="color:#38bdf8;">Score: ${d.safety_score || 100}/100</small>
+                            </td>
+                            <td>
+                                <strong style="color:white;">${d.current_task || 'Idle'}</strong><br>
+                                <span class="tag ${d.status === 'SOS_INCIDENT' ? 'tag-sos' : (d.incident_type !== 'None' ? 'tag-warn' : 'tag-ok')}">
+                                    ${d.incident_type !== 'None' ? d.incident_type : d.status}
+                                </span>
+                            </td>
+                            <td>${actionBtns}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                });
         }
     </script>
 </body>
