@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Field Portal - Fleet Operations</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-green: #22c55e;
+            --accent-blue: #3b82f6;
+            --accent-red: #ef4444;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container { width: 100%; max-width: 480px; }
+        header { text-align: center; margin-bottom: 25px; }
+        header h1 { margin: 0; font-size: 1.5rem; color: var(--accent-blue); }
+        header p { margin: 5px 0 0; color: var(--text-muted); font-size: 0.9rem; }
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            color: var(--text-main);
+        }
+        label {
+            display: block;
+            margin-top: 12px;
+            margin-bottom: 4px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        select, input, textarea {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+        }
+        textarea { resize: vertical; height: 80px; }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary { background-color: var(--accent-green); color: #fff; }
+        .btn-primary:hover { background-color: #16a34a; }
+        .btn-danger { background-color: var(--accent-red); color: #fff; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+        .checklist-item input { width: auto; margin-right: 10px; transform: scale(1.2); }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            background: #334155;
+            color: #fff;
+        }
+        .success-msg { color: #4ade80; text-align: center; font-weight: bold; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🚚 Driver Field Terminal</h1>
+        <p>Live Backend Connected Portal</p>
+    </header>
+
+    <div class="card">
+        <h2>1. Pre-Trip Inspection & Sign-In</h2>
+        <label>Driver Full Name</label>
+        <input type="text" id="driverName" placeholder="Enter your name">
+
+        <label>Select Assigned Vehicle / Route</label>
+        <select id="vehicleSelect">
+            <option value="KDA 101A">KDA 101A - Nairobi Yard ➔ Mombasa Port</option>
+            <option value="KDB 202B">KDB 202B - Nairobi Yard ➔ Nakuru Depot</option>
+            <option value="KDC 303C">KDC 303C - Kisumu Terminal ➔ Eldoret Hub</option>
+            <option value="KDD 404D">KDD 404D - Nairobi Hub ➔ Kisumu Terminal</option>
+        </select>
+
+        <label style="margin-top: 15px;">Safety Checklist</label>
+        <div class="checklist-item">
+            <input type="checkbox" id="checkTires"> <label for="checkTires" style="margin:0; color:inherit;">Tires & Pressure Checked</label>
+        </div>
+        <div class="checklist-item">
+            <input type="checkbox" id="checkFluids"> <label for="checkFluids" style="margin:0; color:inherit;">Oil, Coolant & Brakes Verified</label>
+        </div>
+        <div class="checklist-item">
+            <input type="checkbox" id="checkCargo"> <label for="checkCargo" style="margin:0; color:inherit;">Cargo Secure & Manifest Confirmed</label>
+        </div>
+
+        <button class="btn-primary" onclick="submitCheckIn()">Complete Check-In & Set Active</button>
+        <div id="checkin-success" class="success-msg">✓ Synced with manager dashboard!</div>
+    </div>
+
+    <div class="card" id="statusCard" style="display: none;">
+        <h2>2. Active Shift Status</h2>
+        <p>Current Status: <span id="currentStatusBadge" class="status-badge">ACTIVE</span></p>
+        
+        <label>Update Duty State</label>
+        <select id="dutyState" onchange="updateDuty()">
+            <option value="ACTIVE">ACTIVE (On Route)</option>
+            <option value="STANDBY">STANDBY (Yard)</option>
+            <option value="OFF_DUTY">OFF DUTY</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <h2>3. Incident & Roadblock Reporting</h2>
+        <label>Describe Issue (Mechanical, Traffic, Delay)</label>
+        <textarea id="incidentDesc" placeholder="e.g., Heavy traffic gridlock or minor tire puncture..."></textarea>
+        
+        <button class="btn-danger" onclick="reportIncident()">Dispatch Emergency Alert to Manager</button>
+        <div id="incident-success" class="success-msg" style="color: #f87171;">✓ Alert sent to Mission Control!</div>
+    </div>
+</div>
+
+<script>
+    async function submitCheckIn() {
+        const driver_name = document.getElementById('driverName').value.trim();
+        const reg_no = document.getElementById('vehicleSelect').value;
+        const tires = document.getElementById('checkTires').checked;
+        const fluids = document.getElementById('checkFluids').checked;
+        const cargo = document.getElementById('checkCargo').checked;
+
+        if (!driver_name) { alert("Please enter your name."); return; }
+        if (!tires || !fluids || !cargo) { alert("Please complete the pre-trip safety checklist."); return; }
+
+        try {
+            const res = await fetch('/api/driver/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reg_no, driver_name, status: 'ACTIVE' })
+            });
+
+            if (res.ok) {
+                document.getElementById('statusCard').style.display = 'block';
+                const msg = document.getElementById('checkin-success');
+                msg.style.display = 'block';
+                setTimeout(() => msg.style.display = 'none', 3000);
+            } else {
+                alert("Failed to sync with backend server.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Connection error. Ensure your Go server is running.");
+        }
+    }
+
+    async function updateDuty() {
+        const reg_no = document.getElementById('vehicleSelect').value;
+        const driver_name = document.getElementById('driverName').value.trim();
+        const status = document.getElementById('dutyState').value;
+
+        try {
+            await fetch('/api/driver/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reg_no, driver_name, status })
+            });
+            document.getElementById('currentStatusBadge').innerText = status;
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function reportIncident() {
+        const reg_no = document.getElementById('vehicleSelect').value;
+        const incident = document.getElementById('incidentDesc').value.trim();
+
+        if (!incident) { alert("Please describe the incident."); return; }
+
+        try {
+            const res = await fetch('/api/driver/incident', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reg_no, incident })
+            });
+
+            if (res.ok) {
+                const msg = document.getElementById('incident-success');
+                msg.style.display = 'block';
+                setTimeout(() => msg.style.display = 'none', 3000);
+                document.getElementById('incidentDesc').value = '';
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Failed to send incident alert.");
+        }
+    }
+</script>
+</body>
+</html>
